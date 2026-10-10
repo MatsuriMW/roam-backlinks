@@ -1,0 +1,68 @@
+name: Release
+
+# main.js / styles.css / manifest.json 推送到 main 后：manifest 里的版本号还没有对应的标签，就发一个新版本。
+# Obsidian 社区插件的要求：标签 = manifest.json 的 version（不带 v），附件是 main.js、manifest.json、styles.css。
+# 版本号由本地的 sync.sh 自动加一（提交说明末尾写 #minor / #major 升大版本）。
+# 发完同步到 Linear 的「反链面板」project：发 project 更新、刷新介绍，提交说明里提到的卡评论「已发布于」，基线卡记完整说明。
+on:
+  push:
+    branches: [main]
+    paths: ["main.js", "styles.css", "manifest.json"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: ver
+        run: |
+          new=$(python3 -c "import json;print(json.load(open('manifest.json'))['version'])")
+          python3 -c "import json,sys;v=json.load(open('versions.json'));sys.exit(0 if '$new' in v else 'versions.json has no entry for $new')"
+          prev=$(git describe --tags --abbrev=0 --match '[0-9]*' 2>/dev/null || true)
+          if git rev-parse -q --verify "refs/tags/$new" >/dev/null; then echo "skip=true" >> "$GITHUB_OUTPUT"; else echo "skip=false" >> "$GITHUB_OUTPUT"; fi
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+
+      - name: Write notes
+        if: steps.ver.outputs.skip == 'false'
+        run: |
+          range="${{ steps.ver.outputs.prev }}"
+          [ -n "$range" ] && range="$range..HEAD" || range="HEAD"
+          {
+            echo "## Changes"
+            echo
+            git log --no-merges --format='- %s' $range | sed -E 's/ *#(minor|major)[[:space:]]*$//'
+            echo
+            echo "Install: download \`main.js\`, \`manifest.json\` and \`styles.css\` into \`<vault>/.obsidian/plugins/logseq-roam-style-backlinks/\`, or use BRAT."
+          } > notes.md
+          cat notes.md
+
+      - name: Publish
+        if: steps.ver.outputs.skip == 'false'
+        run: gh release create "${{ steps.ver.outputs.new }}" main.js manifest.json styles.css --target "$GITHUB_SHA" --title "${{ steps.ver.outputs.new }}" --notes-file notes.md --latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Sync to Linear
+        if: steps.ver.outputs.skip == 'false'
+        run: python3 .github/scripts/linear_sync.py release
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_PROJECT: fd7c45c5-6b9b-4f3c-b395-de95b40b21fb
+          LINEAR_BASELINE: MAT-190
+          README_FROM: '<a id="中文说明"></a>'
+          TAG: ${{ steps.ver.outputs.new }}
+          PREV: ${{ steps.ver.outputs.prev }}
+          GH_TOKEN: ${{ github.token }}

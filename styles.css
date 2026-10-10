@@ -1,0 +1,309 @@
+/* frontmatter 写了 cssclasses: [no-backlinks] 的笔记，不在正文底部显示「链接到当前文件 / 提到当前文件」 */
+.no-backlinks .embedded-backlinks { display: none !important; }
+
+/* Roam 式面包屑：命中块上方一行小灰字，各级可点 */
+.search-result-file-match .bd-crumbs {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.3em;
+  margin-bottom: 0.15em; white-space: normal;
+  font-family: var(--font-interface); font-size: var(--font-ui-smaller); line-height: 1.4;
+  color: var(--text-faint); cursor: default;
+}
+.search-result-file-match .bd-crumb {
+  max-width: 18em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  cursor: var(--cursor-link, pointer); border-radius: var(--radius-s);
+}
+.search-result-file-match .bd-crumb:hover { color: var(--text-muted); text-decoration: underline; }
+.search-result-file-match .bd-crumb-sep { color: var(--text-faint); opacity: 0.7; }
+.search-result-file-match .bd-crumb-link { color: var(--text-accent); opacity: 0.75; }
+.search-result-file-match .bd-crumb-tag { color: var(--tag-color, var(--text-accent)); opacity: 0.75; }
+/* 面包屑展开过上下文后，行尾的「收起」 */
+.search-result-file-match .bd-crumb-reset {
+  margin-left: 0.4em; color: var(--text-accent); opacity: 0.8; cursor: var(--cursor-link, pointer);
+}
+.search-result-file-match .bd-crumb-reset:hover { opacity: 1; text-decoration: underline; }
+/* 母块已经作为引用显示，子块里的引用并进去，不单独占一条 */
+.search-result-file-match.bd-dup { display: none; }
+
+/* 反链片段按 Markdown 渲染 */
+.search-result-file-match .bd-md { white-space: normal; }
+.search-result-file-match .bd-md > :first-child { margin-top: 0; }
+.search-result-file-match .bd-md > :last-child { margin-bottom: 0; }
+.search-result-file-match .bd-md p { margin: 0.2em 0; }
+.search-result-file-match .bd-md ul,
+.search-result-file-match .bd-md ol { margin: 0; padding-inline-start: 1.4em; }
+.search-result-file-match .bd-md > ul,
+.search-result-file-match .bd-md > ol { padding-inline-start: 1.1em; }
+.search-result-file-match .bd-md li { margin: 0; }
+.search-result-file-match .bd-md img { max-height: 160px; }
+.search-result-file-match .bd-md a { cursor: var(--cursor); }
+/* 命中的是标题（整节显示）：标题别太大 */
+.search-result-file-match .bd-md h1, .search-result-file-match .bd-md h2, .search-result-file-match .bd-md h3,
+.search-result-file-match .bd-md h4, .search-result-file-match .bd-md h5, .search-result-file-match .bd-md h6 {
+  font-size: 1.05em; margin: 0.2em 0;
+}
+/* 片段里的链接可点（去那一页），复选框可勾 */
+.search-result-file-match .bd-md a.internal-link, .search-result-file-match .bd-md a.tag { cursor: var(--cursor-link, pointer); }
+.search-result-file-match .bd-md input.task-list-item-checkbox:not(:disabled) { cursor: var(--cursor-link, pointer); }
+/* 「提到当前文件」的「链接」按钮：编辑时藏起来 */
+.search-result-file-match.bd-editing .search-result-file-match-replace-button { display: none !important; }
+
+/* 就地编辑：点条目任意位置进入编辑，右上角 ↗ 跳到原文 */
+.search-result-file-match.bd-click-edit { cursor: text; }
+.search-result-file-match .bd-jump-btn {
+  position: absolute; top: 2px; right: 2px; padding: 2px;
+  display: none; z-index: 2; background: var(--background-primary); cursor: var(--cursor);
+}
+.search-result-file-match:hover .bd-jump-btn { display: flex; }
+.search-result-file-match.bd-editing .bd-jump-btn { display: none; }
+.search-result-file-match.bd-editing { cursor: auto; white-space: normal; }
+/* 编辑框和渲染出来的那一块一样宽（跟随「限制行宽」），长行自动折行，不横向滚动；字体字号和正文一致 */
+.bd-edit-input {
+  display: block; box-sizing: border-box; width: 100%; max-width: 100%; min-height: 3em; resize: vertical;
+  font-family: var(--font-text); font-size: var(--font-text-size);
+  line-height: var(--line-height-normal); tab-size: 4;
+  white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden;
+}
+.bd-edit-bar { display: flex; align-items: center; gap: 6px; justify-content: flex-end; margin-top: 4px; }
+.bd-edit-hint { margin-right: auto; color: var(--text-faint); font-size: var(--font-ui-smaller); }
+
+/* 反链片段：字号跟正文一样；字体在设置里选（默认 Lyon Text，没装或中文等它没有的字回落到正文字体） */
+.backlink-pane .search-result-file-matches {
+  font-size: var(--font-text-size);
+  line-height: var(--line-height-normal);
+  font-family: var(--lrsb-snippet-font, var(--font-text)), var(--font-text);
+}
+.backlink-pane .bd-edit-input { font-size: var(--font-text-size); }
+
+/* 反链文件标题行：只有标题文字可点，其余是空白 */
+.backlink-pane .bd-title-row { cursor: default; }
+body .backlink-pane .tree-item-self.is-clickable.bd-title-row:hover { background-color: transparent; color: var(--nav-item-color); font-weight: inherit; }
+.backlink-pane .bd-title-row .tree-item-inner { flex: 0 1 auto; cursor: var(--cursor-link, pointer); border-radius: var(--radius-s); }
+.backlink-pane .bd-title-row .tree-item-inner:hover { background-color: var(--nav-item-background-hover); color: var(--nav-item-color-hover); }
+
+/* 和上一条共用母块时接在它下面：去掉中间的分隔线 */
+.search-result-file-match:has(+ .search-result-file-match.bd-cont) { border-bottom-color: transparent; padding-bottom: 0; }
+.search-result-file-match.bd-cont { padding-top: 0; }
+/* 长子块折叠 */
+.search-result-file-match .bd-expand {
+  display: inline-block; margin-top: 2px; font-size: var(--font-ui-smaller);
+  color: var(--text-accent); cursor: var(--cursor-link, pointer);
+}
+.search-result-file-match .bd-expand:hover { text-decoration: underline; }
+/* 列表块按子块结构折叠：有子块的一级子块圆点带灰圈（像 Logseq 的折叠块），行尾「…」点开；超过 6 个子块后面收成「… 还有 N 项」 */
+.search-result-file-match .bd-md ul > li.bd-folded { list-style: none; position: relative; }
+.search-result-file-match .bd-md ul > li.bd-folded::before {
+  content: ""; position: absolute; left: -0.95em; top: calc(0.75em - 2.5px);
+  width: 5px; height: 5px; border-radius: 50%;
+  background-color: var(--text-muted); box-shadow: 0 0 0 3.5px var(--background-modifier-border-hover);
+}
+.search-result-file-match .bd-md li.bd-more-li { list-style: none; }
+.search-result-file-match .bd-md .bd-fold-mark,
+.search-result-file-match .bd-md .bd-more-mark {
+  color: var(--text-faint); cursor: var(--cursor-link, pointer); border-radius: var(--radius-s); padding: 0 3px;
+}
+.search-result-file-match .bd-md .bd-more-mark { font-size: var(--font-ui-smaller); padding: 0; }
+.search-result-file-match .bd-md .bd-fold-mark:hover,
+.search-result-file-match .bd-md .bd-more-mark:hover { color: var(--text-accent); background-color: var(--background-modifier-hover); }
+/* 展开过的子块：「收起」平时藏着，指到这一块才出现 */
+.search-result-file-match .bd-md .bd-fold-mark.is-open { font-size: var(--font-ui-smaller); visibility: hidden; }
+.search-result-file-match .bd-md li:hover > .bd-fold-mark.is-open,
+.search-result-file-match .bd-md li:hover > p > .bd-fold-mark.is-open { visibility: visible; }
+
+/* 被筛选掉的命中 / 文件 */
+.bd-hidden { display: none !important; }
+
+/* 顶部筛选栏：共现页面筛选 + 就地文字筛选 */
+.bd-toolbar {
+  padding: 4px 8px 2px;
+  font-family: var(--font-interface);
+}
+.bd-toolbar-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bd-filter-input {
+  flex: 1 1 8em; min-width: 6em;
+  font-size: var(--font-ui-smaller);
+  padding: 2px 6px; height: auto;
+}
+.bd-filter-toggle, .bd-filter-clear, .bd-group-toggle {
+  font-size: var(--font-ui-smaller);
+  padding: 2px 8px; height: auto; box-shadow: none; cursor: var(--cursor);
+}
+.bd-filter-clear { color: var(--text-muted); }
+/* 没东西可清时变灰但占着位置，免得文字框被挤来挤去 */
+.bd-filter-clear.is-idle { opacity: 0.4; cursor: default; }
+.bd-group-toggle.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+.bd-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.bd-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 8px; border-radius: 999px;
+  font-size: var(--font-ui-smaller); line-height: 1.6;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted); cursor: var(--cursor-link, pointer);
+  border: 1px solid transparent;
+}
+.bd-chip:hover { background: var(--background-modifier-active-hover); }
+.bd-chip-count { color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.bd-chip-inc { background: var(--interactive-accent); color: var(--text-on-accent); }
+.bd-chip-inc .bd-chip-count { color: var(--text-on-accent); opacity: 0.8; }
+.bd-chip-exc { color: var(--text-faint); border-color: var(--background-modifier-border); }
+.bd-chip-exc .bd-chip-name { text-decoration: line-through; }
+
+/* 分组：按共现页聚成的可折叠簇 */
+.bd-groups { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.bd-group-empty { color: var(--text-faint); font-size: var(--font-ui-smaller); padding: 2px 0; }
+.bd-group-head {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 2px; cursor: var(--cursor-link, pointer);
+  font-size: var(--font-ui-smaller); color: var(--text-normal);
+  border-radius: var(--radius-s);
+}
+.bd-group-head:hover { background: var(--background-modifier-hover); }
+.bd-group-twist { display: inline-flex; transition: transform 0.1s ease; }
+.bd-group-twist .svg-icon { width: 0.85em; height: 0.85em; color: var(--text-faint); }
+.bd-group-head.is-collapsed .bd-group-twist { transform: rotate(-90deg); }
+.bd-group-name { font-weight: var(--font-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bd-group-count {
+  color: var(--text-faint); font-variant-numeric: tabular-nums;
+  padding: 0 6px; border-radius: 8px; border: 1px solid transparent; cursor: var(--cursor-link, pointer);
+}
+/* 次数是「只看这簇」的开关 */
+.bd-group-count:hover { border-color: var(--background-modifier-border); color: var(--text-muted); }
+.bd-group-count.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+.bd-group-list { display: flex; flex-direction: column; padding-left: 1.1em; }
+.bd-group-item {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 1px 4px; border-radius: var(--radius-s);
+  font-size: var(--font-ui-smaller); line-height: 1.5;
+  cursor: var(--cursor-link, pointer); overflow: hidden;
+}
+.bd-group-item:hover { background: var(--background-modifier-hover); }
+.bd-group-file { flex: 0 0 auto; max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-accent); opacity: 0.8; }
+.bd-group-snip { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
+
+/* 块引用计数：命中块右下角，被引用几次 */
+.search-result-file-match .bd-refcounts {
+  position: absolute; bottom: 2px; right: 4px;
+  display: flex; gap: 4px; z-index: 1;
+}
+.search-result-file-match .bd-refcount {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 0 5px; border-radius: 999px;
+  font-size: var(--font-ui-smaller); line-height: 1.5;
+  background: var(--background-modifier-hover); color: var(--text-muted);
+  cursor: var(--cursor-link, pointer); opacity: 0.65;
+}
+.search-result-file-match .bd-refcount:hover { opacity: 1; color: var(--text-accent); }
+.search-result-file-match .bd-refcount .svg-icon { width: 0.9em; height: 0.9em; }
+.search-result-file-match .bd-refcount-n { font-variant-numeric: tabular-nums; }
+/* 编辑时把计数藏起来，别挡编辑框 */
+.search-result-file-match.bd-editing .bd-refcounts { display: none; }
+
+/* LLM Wiki 入口：链到当前页的 wiki 页，单独一行 */
+.bd-wiki { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; margin-top: 6px; font-size: var(--font-ui-smaller); }
+.bd-wiki-label { color: var(--text-faint); }
+.bd-wiki-link { color: var(--text-accent); cursor: var(--cursor-link, pointer); text-decoration: none; }
+.bd-wiki-link:hover { text-decoration: underline; }
+
+/* ---------- 反链分段：页面 / 日记，日记按月、旧年份按年折叠 ---------- */
+.search-result .bd-heads {
+  font-family: var(--font-interface);
+  padding: 0.2em 0 0.1em;
+}
+.search-result .bd-head { color: var(--text-muted); font-size: var(--font-ui-smaller); line-height: 1.6; }
+.search-result .bd-head-sec {
+  font-weight: 600; color: var(--text-normal); font-size: var(--font-ui-small);
+  margin-top: 0.6em; padding-bottom: 0.15em; border-bottom: 1px solid var(--background-modifier-border);
+}
+.search-result .bd-head-month { margin-top: 0.5em; font-weight: 600; }
+.search-result .bd-head-year { margin-top: 0.5em; font-weight: 600; }
+.search-result .bd-head-year.is-clickable { cursor: var(--cursor-link, pointer); }
+.search-result .bd-head-year.is-clickable::before { content: "▸ "; }
+.search-result .bd-head-year.is-open::before { content: "▾ "; }
+.search-result .bd-head-year.is-clickable:hover { color: var(--text-accent); }
+/* 折叠的年份：第一条只留标题，其余整条藏起来 */
+.search-result.bd-year-fold > :not(.bd-heads) { display: none !important; }
+.search-result.bd-year-hidden { display: none !important; }
+/* 页面排在前面的理由 */
+.search-result-file-title .bd-why {
+  margin-left: 0.5em; flex-shrink: 0;
+  font-size: var(--font-ui-smaller); color: var(--text-faint);
+}
+
+/* ---------- 名字筛选（文件名 + 别名） ---------- */
+.bd-names { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 4px 0; }
+.bd-names-label { font-size: var(--font-ui-smaller); color: var(--text-faint); margin-right: 2px; }
+
+/* 「转为链接」点过之后：按钮变成「已链接 ✓」，面板不刷新 */
+.search-result-file-match-replace-button.bd-linked,
+.search-result-file-match-replace-button.bd-linked:hover {
+  color: var(--text-faint); background: transparent; box-shadow: none; cursor: default;
+}
+
+/* Bullet 插件 Zoom 进列表块时顶上的面包屑（Shift 点开到右侧栏时最明显）：
+   原样式是一行横向滚动、每级最宽 220px、超出用省略号截掉；改成折行，每一级的文字完整显示 */
+.bullet-zoom-breadcrumbs.bullet-zoom-breadcrumbs {
+  flex-wrap: wrap; align-items: baseline; row-gap: 2px; overflow-x: visible;
+}
+.bullet-zoom-breadcrumbs.bullet-zoom-breadcrumbs button {
+  flex-shrink: 1; max-width: 100%; height: auto; min-height: 0;
+  padding: 2px 4px; line-height: 1.4; text-align: left;
+  white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere;
+}
+
+/* 导出 PDF 时接在正文后面的「链接到当前文件」 */
+.bd-print-backlinks { margin-top: 2em; }
+.bd-print-backlinks h3 { margin-top: 1.4em; padding-bottom: 0.2em; border-bottom: 1px solid #ddd; }
+.bd-print-backlinks .bd-print-crumbs { color: #888; font-size: 0.85em; margin: 0.8em 0 0.1em; }
+
+/* 导出 PDF 的精致排版：只在导出窗口里生效（挂在 .print.bd-pdf 下面），颜色和字体走变量 */
+.print.bd-pdf { --bd-accent: #3a6ea5; --bd-ink: #1f2328; --bd-muted: #6b7280; --bd-line: #e5e7eb; --bd-soft: color-mix(in srgb, var(--bd-accent) 7%, white); }
+.print.bd-pdf .markdown-preview-view, .print.bd-pdf .markdown-rendered {
+  font-family: var(--bd-font, var(--font-text)); font-size: var(--bd-size, 14.5px); line-height: 1.8;
+  color: var(--bd-ink); letter-spacing: 0.01em; text-align: justify; -webkit-font-smoothing: antialiased;
+}
+.print.bd-pdf p { margin: 0 0 0.9em; orphans: 3; widows: 3; }
+.print.bd-pdf h1, .print.bd-pdf h2, .print.bd-pdf h3, .print.bd-pdf h4, .print.bd-pdf h5, .print.bd-pdf h6 {
+  font-family: var(--bd-head-font, var(--bd-font, var(--font-text))); color: var(--bd-ink);
+  line-height: 1.35; break-after: avoid; text-align: left;
+}
+.print.bd-pdf h1 { font-size: 1.95em; font-weight: 700; margin: 0 0 1.1em; padding-bottom: 0.35em; border-bottom: 2px solid var(--bd-accent); }
+.print.bd-pdf h2 { font-size: 1.45em; font-weight: 700; margin: 1.8em 0 0.7em; padding-left: 0.55em; border-left: 4px solid var(--bd-accent); }
+.print.bd-pdf h3 { font-size: 1.2em; font-weight: 650; margin: 1.5em 0 0.6em; color: var(--bd-accent); }
+.print.bd-pdf h4, .print.bd-pdf h5, .print.bd-pdf h6 { font-size: 1.05em; font-weight: 650; margin: 1.2em 0 0.5em; color: #374151; }
+.print.bd-pdf a, .print.bd-pdf .internal-link, .print.bd-pdf .external-link { color: var(--bd-accent); text-decoration: none; }
+.print.bd-pdf strong { color: #111; font-weight: 700; }
+.print.bd-pdf em { color: #374151; }
+.print.bd-pdf mark { background: color-mix(in srgb, var(--bd-accent) 18%, white); color: inherit; padding: 0 0.15em; border-radius: 3px; }
+.print.bd-pdf ul, .print.bd-pdf ol { padding-left: 1.4em; margin: 0.3em 0 0.9em; }
+.print.bd-pdf li { margin: 0.2em 0; }
+.print.bd-pdf li::marker { color: var(--bd-accent); }
+.print.bd-pdf .list-bullet::after { background-color: var(--bd-accent); }
+.print.bd-pdf input[type=checkbox] { accent-color: var(--bd-accent); }
+.print.bd-pdf blockquote {
+  margin: 1em 0; padding: 0.6em 1em; color: #4b5563; background: var(--bd-soft);
+  border-left: 3px solid var(--bd-accent); border-radius: 0 6px 6px 0; break-inside: avoid;
+}
+.print.bd-pdf blockquote > :last-child { margin-bottom: 0; }
+.print.bd-pdf code { font-size: 0.86em; padding: 0.12em 0.38em; border-radius: 4px; background: #f3f4f6; color: #be185d; }
+.print.bd-pdf pre { background: #f8f9fa; border: 1px solid var(--bd-line); border-radius: 8px; padding: 0.9em 1.1em; break-inside: avoid; }
+.print.bd-pdf pre code { background: none; color: inherit; padding: 0; font-size: 0.84em; }
+.print.bd-pdf table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 0.93em; break-inside: avoid; }
+.print.bd-pdf th { background: color-mix(in srgb, var(--bd-accent) 10%, white); color: var(--bd-ink); font-weight: 650; }
+.print.bd-pdf th, .print.bd-pdf td { border: 1px solid var(--bd-line); padding: 0.45em 0.7em; text-align: left; }
+.print.bd-pdf hr { border: none; border-top: 1px solid var(--bd-line); margin: 2em 0; }
+.print.bd-pdf img { max-width: 100%; border-radius: 6px; break-inside: avoid; }
+.print.bd-pdf .tag { background: color-mix(in srgb, var(--bd-accent) 12%, white); color: var(--bd-accent); border: none; border-radius: 999px; padding: 0.05em 0.55em; font-size: 0.85em; }
+.print.bd-pdf .callout { border-radius: 8px; break-inside: avoid; }
+.print.bd-pdf .bd-print-backlinks { margin-top: 2.5em; }
+.print.bd-pdf .bd-print-backlinks > hr { border-top: 2px solid var(--bd-accent); margin: 0 0 1.2em; }
+.print.bd-pdf .bd-print-backlinks h3 { color: var(--bd-ink); border-bottom: 1px solid var(--bd-line); padding-bottom: 0.25em; }
+.print.bd-pdf .bd-print-backlinks h3 .internal-link { color: var(--bd-ink); }
+.print.bd-pdf .bd-print-crumbs { color: var(--bd-muted); font-size: 0.82em; margin: 0.9em 0 0.15em; padding-left: 0.6em; border-left: 2px solid color-mix(in srgb, var(--bd-accent) 45%, white); }
+
+/* 编辑模式里正文底部的反链紧跟在正文后面：「滚过末尾」类的功能（Obsidian 自己的 100px、Bullet 插件的折叠滚动预留等）
+   会给 .cm-content 加一整屏的下内边距，反链被挤到一屏之外。有反链时把这段空白挪到反链下面，可滚动的总高度不变 */
+.workspace-leaf-content:not(.no-backlinks) .markdown-source-view.mod-cm6 .cm-sizer:has(> .embedded-backlinks) .cm-content {
+  padding-bottom: var(--size-4-8, 32px) !important;
+}
+.workspace-leaf-content:not(.no-backlinks) .markdown-source-view.mod-cm6 .cm-sizer > .embedded-backlinks {
+  padding-bottom: var(--bullet-fold-scroll-reserve, 50vh);
+}

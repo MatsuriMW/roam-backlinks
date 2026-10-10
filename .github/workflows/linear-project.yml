@@ -1,0 +1,26 @@
+name: Sync Linear project
+
+# 不发版的推送（README、workflow 等）也把 Linear「反链面板」project 的介绍刷新成 README 的中文说明 + 当前版本 + 最近 10 次提交。
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["main.js", "styles.css", "manifest.json"]
+  workflow_dispatch:
+
+concurrency:
+  group: linear
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 20
+      - run: python3 .github/scripts/linear_sync.py project
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_PROJECT: fd7c45c5-6b9b-4f3c-b395-de95b40b21fb
+          README_FROM: '<a id="中文说明"></a>'
+          GH_TOKEN: ${{ github.token }}

@@ -1,5 +1,6 @@
 /* frontmatter 写了 cssclasses: [no-backlinks] 的笔记，不在正文底部显示「链接到当前文件 / 提到当前文件」 */
-.no-backlinks .embedded-backlinks { display: none !important; }
+.workspace-leaf-content.no-backlinks .markdown-source-view .embedded-backlinks,
+.workspace-leaf-content.no-backlinks .markdown-reading-view .embedded-backlinks { display: none; }
 
 /* Roam 式面包屑：命中块上方一行小灰字，各级可点 */
 .search-result-file-match .bd-crumbs {
@@ -45,7 +46,8 @@
 .search-result-file-match .bd-md a.internal-link, .search-result-file-match .bd-md a.tag { cursor: var(--cursor-link, pointer); }
 .search-result-file-match .bd-md input.task-list-item-checkbox:not(:disabled) { cursor: var(--cursor-link, pointer); }
 /* 「提到当前文件」的「链接」按钮：编辑时藏起来 */
-.search-result-file-match.bd-editing .search-result-file-match-replace-button { display: none !important; }
+.search-result-file-match.bd-editing .search-result-file-match-replace-button,
+.search-result-file-match.bd-editing:hover .search-result-file-match-replace-button { display: none; }
 
 /* 就地编辑：点条目任意位置进入编辑，右上角 ↗ 跳到原文 */
 .search-result-file-match.bd-click-edit { cursor: text; }
@@ -81,7 +83,7 @@ body .backlink-pane .tree-item-self.is-clickable.bd-title-row:hover { background
 .backlink-pane .bd-title-row .tree-item-inner:hover { background-color: var(--nav-item-background-hover); color: var(--nav-item-color-hover); }
 
 /* 和上一条共用母块时接在它下面：去掉中间的分隔线 */
-.search-result-file-match:has(+ .search-result-file-match.bd-cont) { border-bottom-color: transparent; padding-bottom: 0; }
+.search-result-file-match.bd-before-cont { border-bottom-color: transparent; padding-bottom: 0; }
 .search-result-file-match.bd-cont { padding-top: 0; }
 /* 长子块折叠 */
 .search-result-file-match .bd-expand {
@@ -110,7 +112,7 @@ body .backlink-pane .tree-item-self.is-clickable.bd-title-row:hover { background
 .search-result-file-match .bd-md li:hover > p > .bd-fold-mark.is-open { visibility: visible; }
 
 /* 被筛选掉的命中 / 文件 */
-.bd-hidden { display: none !important; }
+.backlink-pane .bd-hidden, .embedded-backlinks .bd-hidden, .search-result-container .bd-hidden { display: none; }
 
 /* 顶部筛选栏：共现页面筛选 + 就地文字筛选 */
 .bd-toolbar {
@@ -220,8 +222,8 @@ body .backlink-pane .tree-item-self.is-clickable.bd-title-row:hover { background
 .search-result .bd-head-year.is-open::before { content: "▾ "; }
 .search-result .bd-head-year.is-clickable:hover { color: var(--text-accent); }
 /* 折叠的年份：第一条只留标题，其余整条藏起来 */
-.search-result.bd-year-fold > :not(.bd-heads) { display: none !important; }
-.search-result.bd-year-hidden { display: none !important; }
+.search-result.bd-year-fold > :not(.bd-heads) { display: none; }
+.search-results-children > .search-result.bd-year-hidden { display: none; }
 /* 页面排在前面的理由 */
 .search-result-file-title .bd-why {
   margin-left: 0.5em; flex-shrink: 0;
@@ -301,9 +303,10 @@ body .backlink-pane .tree-item-self.is-clickable.bd-title-row:hover { background
 
 /* 编辑模式里正文底部的反链紧跟在正文后面：「滚过末尾」类的功能（Obsidian 自己的 100px、Bullet 插件的折叠滚动预留等）
    会给 .cm-content 加一整屏的下内边距，反链被挤到一屏之外。有反链时把这段空白挪到反链下面，可滚动的总高度不变 */
-.workspace-leaf-content:not(.no-backlinks) .markdown-source-view.mod-cm6 .cm-sizer:has(> .embedded-backlinks) .cm-content {
+/* 插件给有反链的编辑视图挂 rb-inline-backlinks 类；Bullet 的预留是强制优先级，这里只能同样强制才盖得过 */
+.workspace-leaf-content.rb-inline-backlinks:not(.no-backlinks) .markdown-source-view.mod-cm6 .cm-content {
   padding-bottom: var(--size-4-8, 32px) !important;
 }
-.workspace-leaf-content:not(.no-backlinks) .markdown-source-view.mod-cm6 .cm-sizer > .embedded-backlinks {
+.workspace-leaf-content.rb-inline-backlinks:not(.no-backlinks) .markdown-source-view.mod-cm6 .cm-sizer > .embedded-backlinks {
   padding-bottom: var(--bullet-fold-scroll-reserve, 50vh);
 }

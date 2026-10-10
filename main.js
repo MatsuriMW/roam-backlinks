@@ -4,7 +4,7 @@ const { Plugin, PluginSettingTab, MarkdownRenderer, Component, Notice, setIcon, 
 const LANG = (() => {
   try {
     const o = require("obsidian");
-    const l = (typeof o.getLanguage === "function" ? o.getLanguage() : window.localStorage.getItem("language")) || "en";
+    const l = (typeof o.getLanguage === "function" ? o.getLanguage() : moment.locale()) || "en";
     return /^zh/i.test(l) ? "zh" : "en";
   } catch (e) { return "en"; }
 })();
@@ -535,6 +535,8 @@ module.exports = class RoamBacklinks extends Plugin {
       }
     });
     for (const el of this.toolbars || []) el.remove();
+    document.querySelectorAll(".rb-inline-backlinks").forEach((el) => el.removeClass("rb-inline-backlinks"));
+    document.querySelectorAll(".bd-before-cont").forEach((el) => el.removeClass("bd-before-cont"));
     this.app.workspace.iterateAllLeaves((leaf) => {
       const root = leaf.view && leaf.view.containerEl;
       if (root) root.querySelectorAll(".bd-hidden").forEach((el) => el.removeClass("bd-hidden"));
@@ -554,6 +556,8 @@ module.exports = class RoamBacklinks extends Plugin {
       if (view.getViewType && view.getViewType() === "markdown" && view.containerEl) {
         const path = view.file ? view.file.path : "";
         view.containerEl.toggleClass("no-backlinks", hideFolders().some((f) => path.startsWith(f)));
+        // 编辑视图里正文底部有反链：挂个类，styles.css 据此把「滚过末尾」的空白挪到反链下面（用类代替 CSS 父选择器）
+        view.containerEl.toggleClass("rb-inline-backlinks", !!view.containerEl.querySelector(".markdown-source-view .cm-sizer > .embedded-backlinks"));
       }
       // view.backlink：侧边栏反向链接面板；view.backlinks：笔记底部的反向链接
       for (const component of [view.backlink, view.backlinks]) {
@@ -903,6 +907,8 @@ module.exports = class RoamBacklinks extends Plugin {
     const cont = !!(prev && crumbs.length && prev.__bdCrumbKey === key && !expanded);
     m.__bdCrumbKey = key;
     m.el.toggleClass("bd-cont", cont);
+    // 上一条接着这一条显示时，去掉它下面的分隔线（用类代替 CSS 父选择器）
+    if (prev && prev.el) prev.el.toggleClass("bd-before-cont", cont);
     const crumbEl = (crumbs.length && !cont) || expanded ? this.renderCrumbs(m, crumbs) : null;
     if (S.renderMarkdown) this.renderMarkdown(m, ctx, range, crumbEl);
     else if (crumbEl) m.el.insertBefore(crumbEl, m.el.firstChild);

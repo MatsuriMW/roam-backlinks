@@ -442,7 +442,7 @@ function watchPairWrap(ta) {
   takeSnap();
 }
 
-module.exports = class LogseqRoamStyleBacklinks extends Plugin {
+module.exports = class RoamBacklinks extends Plugin {
   async onload() {
     S = this.settings = Object.assign({}, DEFAULTS, await this.loadData());
     this.addSettingTab(new BacklinkSettingTab(this.app, this));
@@ -515,7 +515,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
 
   onunload() {
     this.unloaded = true;
-    document.body.style.removeProperty("--lrsb-snippet-font");
+    document.body.style.removeProperty("--roam-backlinks-snippet-font");
     this.eachComponent((c) => this.thaw(c, true));
     this.app.workspace.iterateAllLeaves((leaf) => {
       for (const c of [leaf.view && leaf.view.backlink, leaf.view && leaf.view.backlinks]) {
@@ -644,7 +644,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
       try {
         const fileDom = this.parentDom;
         if (fileDom && plugin.backlinkDoms.has(fileDom.parentDom)) plugin.decorate(this);
-      } catch (e) { console.error("[logseq-roam-style-backlinks] render", e); }
+      } catch (e) { console.error("[roam-backlinks] render", e); }
     };
     proto.__bdAncestors = true;
     this.matchProto = proto;
@@ -949,7 +949,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
     if (c.unlinkedQueue === q.dummy) c.unlinkedQueue = q.u;
     if (!recompute) return;
     const f = c.file || c.__bdTarget;
-    try { c.recomputeBacklink(f); c.recomputeUnlinked(f); } catch (e) { console.error("[logseq-roam-style-backlinks] thaw", e); }
+    try { c.recomputeBacklink(f); c.recomputeUnlinked(f); } catch (e) { console.error("[roam-backlinks] thaw", e); }
   }
 
   thawFor(path) {
@@ -1228,7 +1228,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
         }
         finish();
       } catch (e) {
-        console.error("[logseq-roam-style-backlinks] save", e);
+        console.error("[roam-backlinks] save", e);
         new Notice(t("notSaved", e.message), 6000);
         saveBtn.disabled = cancelBtn.disabled = false;
         saving = false;
@@ -1360,7 +1360,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
       this.afterRender(m, box, sourcePath);
       const scroll = m.parentDom && m.parentDom.parentDom && m.parentDom.parentDom.infinityScroll;
       if (scroll) scroll.invalidate(m);
-    }).catch((e) => console.error("[logseq-roam-style-backlinks] markdown", e));
+    }).catch((e) => console.error("[roam-backlinks] markdown", e));
   }
 
   // 命中列表项按子块结构挑出要显示的行：自己 + 一级子块（最多 S.childLimit 个，其余收成「…」）；
@@ -1585,7 +1585,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
       const origOpen = Modal.prototype.open;
       Modal.prototype.open = function (...a) {
         Modal.prototype.open = origOpen;
-        try { plugin.enhancePdfModal(this); } catch (e) { console.error("[logseq-roam-style-backlinks] pdf modal", e); }
+        try { plugin.enhancePdfModal(this); } catch (e) { console.error("[roam-backlinks] pdf modal", e); }
         return origOpen.apply(this, a);
       };
       try { return orig.apply(this, args); } finally { Modal.prototype.open = origOpen; }
@@ -1617,7 +1617,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
       const body = await origPrint.call(this, el, comp, includeName);
       if (this.__bdBacklinks) {
         try { await plugin.appendPrintBacklinks(body || el, this.file, comp); }
-        catch (e) { console.error("[logseq-roam-style-backlinks] pdf backlinks", e); new Notice(t("pdfBacklinksFailed")); }
+        catch (e) { console.error("[roam-backlinks] pdf backlinks", e); new Notice(t("pdfBacklinksFailed")); }
       }
       return body;
     };
@@ -2086,7 +2086,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
       if (S.showCooccur) this.refreshChips(component, data);
       if (S.groupBacklinks) this.renderGroups(component, data);
       this.applyFilter(component);
-    } catch (e) { console.error("[logseq-roam-style-backlinks] filter", e); }
+    } catch (e) { console.error("[roam-backlinks] filter", e); }
   }
 
   // 扫一遍反链命中，得到每个共现页的次数，以及每条命中带哪些共现页（分组复用）
@@ -2548,7 +2548,7 @@ module.exports = class LogseqRoamStyleBacklinks extends Plugin {
   // 反链片段字体：挂成 body 上的 CSS 变量，styles.css 里用
   applySnippetFont() {
     const f = String(S.snippetFont || "").trim();
-    if (f) document.body.style.setProperty("--lrsb-snippet-font", /[,"']/.test(f) ? f : `"${f}"`);
-    else document.body.style.removeProperty("--lrsb-snippet-font");
+    if (f) document.body.style.setProperty("--roam-backlinks-snippet-font", /[,"']/.test(f) ? f : `"${f}"`);
+    else document.body.style.removeProperty("--roam-backlinks-snippet-font");
   }
 };

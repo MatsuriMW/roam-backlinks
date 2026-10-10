@@ -70,7 +70,7 @@
 .backlink-pane .search-result-file-matches {
   font-size: var(--font-text-size);
   line-height: var(--line-height-normal);
-  font-family: var(--lrsb-snippet-font, var(--font-text)), var(--font-text);
+  font-family: var(--roam-backlinks-snippet-font, var(--font-text)), var(--font-text);
 }
 .backlink-pane .bd-edit-input { font-size: var(--font-text-size); }
 

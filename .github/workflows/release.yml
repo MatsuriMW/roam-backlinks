@@ -45,7 +45,7 @@ jobs:
             echo
             git log --no-merges --format='- %s' $range | sed -E 's/ *#(minor|major)[[:space:]]*$//'
             echo
-            echo "Install: download \`main.js\`, \`manifest.json\` and \`styles.css\` into \`<vault>/.obsidian/plugins/logseq-roam-style-backlinks/\`, or use BRAT."
+            echo "Install: download \`main.js\`, \`manifest.json\` and \`styles.css\` into \`<vault>/.obsidian/plugins/roam-backlinks/\`, or use BRAT."
           } > notes.md
           cat notes.md
 

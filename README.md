@@ -1,4 +1,4 @@
-# Logseq & Roam Style Backlinks
+# Roam Backlinks
 
 Edit your backlinks in place, block by block, the way Logseq and Roam Research do it.
 
@@ -39,7 +39,7 @@ Several plugins improve backlinks, and they are worth a look: Better Backlinks, 
 
 ## Settings
 
-Every feature can be turned off in **Settings → Logseq & Roam Style Backlinks**: blocks, editing, sorting, filtering, navigation and PDF export. You can also choose the font for backlink blocks (Lyon Text by default, falling back to your text font), folders whose in-note backlinks are hidden, and a folder to list separately (for example an AI-maintained wiki).
+Every feature can be turned off in **Settings → Roam Backlinks**: blocks, editing, sorting, filtering, navigation and PDF export. You can also choose the font for backlink blocks (Lyon Text by default, falling back to your text font), folders whose in-note backlinks are hidden, and a folder to list separately (for example an AI-maintained wiki).
 
 ## Commands
 
@@ -48,11 +48,11 @@ Every feature can be turned off in **Settings → Logseq & Roam Style Backlinks*
 
 ## Installation
 
-**From Community plugins** (once approved): search for “Logseq & Roam Style Backlinks”.
+**From Community plugins** (once approved): search for “Roam Backlinks”.
 
-**Manually:** download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/MatsuriMW/logseq-roam-style-backlinks/releases/latest) into `<your vault>/.obsidian/plugins/logseq-roam-style-backlinks/`, then enable the plugin.
+**Manually:** download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/MatsuriMW/roam-backlinks/releases/latest) into `<your vault>/.obsidian/plugins/roam-backlinks/`, then enable the plugin.
 
-**With BRAT:** add `MatsuriMW/logseq-roam-style-backlinks`.
+**With BRAT:** add `MatsuriMW/roam-backlinks`.
 
 ## Notes
 
@@ -93,4 +93,4 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 
 所有功能都能在设置里单独开关。界面语言跟随 Obsidian：中文界面显示中文，其余显示英文。
 
-安装：社区插件市场搜索「Logseq & Roam Style Backlinks」（审核通过后）；或者从 [最新 Release](https://github.com/MatsuriMW/logseq-roam-style-backlinks/releases/latest) 下载 `main.js`、`manifest.json`、`styles.css` 放进 `<库>/.obsidian/plugins/logseq-roam-style-backlinks/`；或者用 BRAT 添加 `MatsuriMW/logseq-roam-style-backlinks`。
+安装：社区插件市场搜索「Roam Backlinks」（审核通过后）；或者从 [最新 Release](https://github.com/MatsuriMW/roam-backlinks/releases/latest) 下载 `main.js`、`manifest.json`、`styles.css` 放进 `<库>/.obsidian/plugins/roam-backlinks/`；或者用 BRAT 添加 `MatsuriMW/roam-backlinks`。

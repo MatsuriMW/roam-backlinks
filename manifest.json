@@ -1,7 +1,7 @@
 {
   "id": "roam-backlinks",
   "name": "Roam Backlinks",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "minAppVersion": "1.4.0",
   "description": "Edit backlinks in place, block by block, just like in Logseq and Roam Research, with breadcrumbs that expand context, relevance sorting, co-mention filters and PDF export with backlinks.",
   "author": "MatsuriMW",

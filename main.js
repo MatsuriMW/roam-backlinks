@@ -20,6 +20,7 @@ const STRINGS = {
     cmdGoto: "Jump to backlinks of the current note",
     linkChanged: "This passage has changed in its note, so nothing was modified. Reopen this note to refresh the backlinks and try again.",
     linked: "Linked ✓",
+    internalsChanged: "Roam Backlinks: this Obsidian version changed the backlinks pane internals, so some features are turned off. Details are in the developer console.",
     linkedTip: "Converted to a link. The panel refreshes when you leave or reopen this note.",
     collapse: "Collapse",
     jumpTip: `Open in its note (${MOD}click: new tab)`,
@@ -84,6 +85,7 @@ const STRINGS = {
     cmdGoto: "跳到当前笔记的反向链接",
     linkChanged: "这一处原文已经变了，没有改动。重新打开这一页、刷新反链后再试",
     linked: "已链接 ✓",
+    internalsChanged: "Roam Backlinks：这一版 Obsidian 改了反链面板的内部结构，部分功能先关掉了，详情在开发者控制台",
     linkedTip: "已转为链接；离开或重新打开这一页后刷新",
     collapse: "收起",
     jumpTip: `跳到原文（${MOD}点 = 新标签）`,
@@ -446,17 +448,36 @@ module.exports = class RoamBacklinks extends Plugin {
   async onload() {
     S = this.settings = Object.assign({}, DEFAULTS, await this.loadData());
     this.addSettingTab(new BacklinkSettingTab(this.app, this));
+    this.shapeMiss = new Set();
+    // 卸载时摘掉加在笔记视图、反链条目上的类（Component.unload 倒着跑 register 的回调，这一条最先登记、最后执行）
+    this.register(() => this.app.workspace.iterateAllLeaves((leaf) => {
+      const root = leaf.view && leaf.view.containerEl;
+      if (!root) return;
+      root.removeClass("no-backlinks", "rb-inline-backlinks");
+      root.querySelectorAll(".bd-hidden, .bd-before-cont, .bd-title-row").forEach((el) => el.removeClass("bd-hidden", "bd-before-cont", "bd-title-row"));
+    }));
+    // 挂在面板对象上的补丁，还原函数记在这里（见 undoOn），卸载时后打的先还原
+    this.undoList = [];
+    this.undoKeys = new WeakMap();
+    this.register(() => {
+      for (const u of this.undoList.splice(0).reverse()) {
+        try { u.fn(); } catch (e) { console.error("[roam-backlinks] undo", e); }
+      }
+    });
     this.applySnippetFont();
+    this.register(() => document.body.style.removeProperty("--roam-backlinks-snippet-font"));
     this.patchPdfExport();
+    this.listenAllWindows("click", (e) => this.onTitleRowClick(e));
+    this.listenAllWindows("click", (e) => this.onMatchClick(e));
     // 每个面板只设置一次，之后你在该面板里手动切换的选项会保留
     this.applied = new WeakSet();
     this.openInit = new WeakSet();
-    this.toolbars = [];   // 顶部筛选栏，卸载时移除（同上，要在 onLayoutReady 之前建好）
     this.backlinkDoms = new WeakSet();   // 只改反链面板，不影响全局搜索（要在 onLayoutReady 之前建好：重载插件时它会立刻执行）
     const apply = () => {
       this.applyAll();
       setTimeout(() => this.applyAll(), 50);
       setTimeout(() => this.applyAll(), 600);   // 反链是异步算出来的，晚一点再补一次
+      this.sweepSoon();   // 关掉的面板：回收它的命中组件和登记的还原
     };
     this.registerEvent(this.app.workspace.on("layout-change", apply));
     this.registerEvent(this.app.workspace.on("active-leaf-change", apply));
@@ -464,20 +485,26 @@ module.exports = class RoamBacklinks extends Plugin {
     // 重新打开同一页 = 刷新：解冻并重新读取反链
     this.registerEvent(this.app.workspace.on("file-open", (f) => { if (f && S.freezeAfterLink) this.thawFor(f.path); }));
 
-    {
-      // 全库扫一遍 ^id 块引用建索引，之后按文件增量更新（设置里关掉时不建）
-      this.app.workspace.onLayoutReady(() => { if (S.blockRefcount) this.buildBlockIndex(); });
-      this.registerEvent(this.app.metadataCache.on("changed", (f) => { if (this.blockCounts) this.indexFile(f); }));
-      this.registerEvent(this.app.metadataCache.on("deleted", (f) => { if (this.blockCounts) this.removeFile(f.path); }));
-      this.registerEvent(this.app.vault.on("rename", () => { if (this.blockCounts) this.buildBlockIndex(); }));
-    }
+    // 每条命中渲染 Markdown 用的 Component（挂在插件下面），命中被丢掉后由 sweepStale 卸载
+    this.matchComps = new Set();
+    this.sweepSoon = debounce(() => this.sweepStale(), 1000, true);
 
-    // 当前笔记属性变了（开 / 关大小写敏感、改别名）：重画反链
+    // 全库扫一遍 ^id 块引用建索引，之后按文件增量更新（设置里关掉时不建）
+    this.app.workspace.onLayoutReady(() => { if (S.blockRefcount) this.buildBlockIndex(); });
+    this.registerEvent(this.app.metadataCache.on("deleted", (f) => { if (this.blockCounts) this.removeFile(f.path); }));
+    this.registerEvent(this.app.vault.on("rename", (f, oldPath) => { if (this.blockCounts) this.renameInIndex(f, oldPath); }));
+
+    // 所有「某篇的元数据变了」都在这一处处理
     this.caseSig = new Map();
     this.registerEvent(this.app.metadataCache.on("changed", (f) => {
+      this.clearRelationCache();
+      if (this.blockCounts) this.indexFile(f);
+      // 当前笔记属性变了（开 / 关大小写敏感、改别名）：重画反链
       const sig = this.caseSignature(f);
       if (this.caseSig.has(f.path) && this.caseSig.get(f.path) !== sig) { this.caseSig.set(f.path, sig); this.rerenderAll(); this.applyAll(); }
     }));
+    // 关联紧密度用到的「每页被引用总数」缓存，库有变动就重算
+    this.registerEvent(this.app.metadataCache.on("resolved", () => this.clearRelationCache()));
     this.addCommand({
       id: "toggle-case-sensitive",
       name: t("cmdToggleCase"),
@@ -503,49 +530,58 @@ module.exports = class RoamBacklinks extends Plugin {
       callback: () => this.gotoBacklinks(),
     });
 
-    // 关联紧密度用到的「每页被引用总数」缓存，库有变动就重算
-    {
-      const dirty = () => { this._df = null; this._udf = null; this._tags = null; };
-      this.registerEvent(this.app.metadataCache.on("resolved", dirty));
-      this.registerEvent(this.app.metadataCache.on("changed", dirty));
-    }
     // 放在最后：布局已就绪时（比如重载插件）它会立刻执行，上面的初始化得先做完
     this.app.workspace.onLayoutReady(apply);
   }
 
-  onunload() {
+  // Component.unload 先卸子组件、再跑 register 登记的还原，最后才调 onunload，所以「正在卸载」要在这里最先标上，
+  // 免得还原途中触发的 changed / 回收又去改面板
+  unload() {
     this.unloaded = true;
-    document.body.style.removeProperty("--roam-backlinks-snippet-font");
-    this.eachComponent((c) => this.thaw(c, true));
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      for (const c of [leaf.view && leaf.view.backlink, leaf.view && leaf.view.backlinks]) {
-        for (const dom of c ? [c.backlinkDom, c.unlinkedDom] : []) {
-          if (!dom || !dom.__bdSorted) continue;
-          delete dom.onChange; delete dom.__bdSorted; delete dom.__bdSortChanged;
-          this.eachFileDom(dom, (fd) => { fd.el.querySelectorAll(":scope > .bd-heads").forEach((x) => x.remove()); fd.el.removeClass("bd-year-fold", "bd-year-hidden"); });
-          try { dom.onChange(); } catch (e) { /* 面板已关 */ }
-        }
-      }
-    });
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      for (const c of [leaf.view && leaf.view.backlink, leaf.view && leaf.view.backlinks]) {
-        for (const dom of c ? [c.backlinkDom, c.unlinkedDom] : []) {
-          if (dom && dom.__bdOrigChanged) { dom.changed = dom.__bdOrigChanged; delete dom.__bdOrigChanged; delete dom.__bdHooked; }
-        }
-      }
-    });
-    for (const el of this.toolbars || []) el.remove();
-    document.querySelectorAll(".rb-inline-backlinks").forEach((el) => el.removeClass("rb-inline-backlinks"));
-    document.querySelectorAll(".bd-before-cont").forEach((el) => el.removeClass("bd-before-cont"));
-    this.app.workspace.iterateAllLeaves((leaf) => {
-      const root = leaf.view && leaf.view.containerEl;
-      if (root) root.querySelectorAll(".bd-hidden").forEach((el) => el.removeClass("bd-hidden"));
-    });
-    if (this.matchProto && this.origRender) {
-      this.matchProto.render = this.origRender;
-      delete this.matchProto.__bdAncestors;
-      this.rerenderAll();
+    super.unload();
+  }
+
+  onunload() {
+    // 各处补丁都已经由各自登记的还原撤掉了，这里只把反链条目按原生的 render 重画一遍
+    if (this.origRender) this.rerenderAll();
+  }
+
+  // 给某个面板对象（反链组件 / 结果列表）打了补丁：在这里登记它的还原。
+  // 带 key 的同一个对象只登记一次；记号放在插件实例这边，插件重载后新实例会重新登记（面板对象重载前后是同一个）
+  undoOn(owner, fn, key) {
+    if (key) {
+      let keys = this.undoKeys.get(owner);
+      if (!keys) this.undoKeys.set(owner, (keys = new Set()));
+      if (keys.has(key)) return;
+      keys.add(key);
     }
+    this.undoList.push({ owner, fn });
+  }
+
+  // 每个窗口（含弹出的小窗口）的 document 上挂一个捕获阶段的监听；窗口关掉就摘，插件卸载时全摘
+  listenAllWindows(type, handler) {
+    const attached = new Map();
+    const add = (win) => {
+      if (!win || !win.document || attached.has(win)) return;
+      win.document.addEventListener(type, handler, true);
+      attached.set(win, () => win.document.removeEventListener(type, handler, true));
+    };
+    add(window);
+    this.app.workspace.iterateAllLeaves((leaf) => add(leaf.view && leaf.view.containerEl && leaf.view.containerEl.win));
+    this.registerEvent(this.app.workspace.on("window-open", (_w, win) => add(win)));
+    this.registerEvent(this.app.workspace.on("window-close", (_w, win) => { const off = attached.get(win); if (off) { off(); attached.delete(win); } }));
+    this.register(() => { for (const off of attached.values()) off(); attached.clear(); });
+  }
+
+  // Obsidian 改了内部结构、对不上时：这个功能跳过，控制台记一次、只弹一次提示，其它功能照常
+  shapeOk(feature, ok, what) {
+    if (ok) return true;
+    if (!this.shapeMiss.has(feature)) {
+      this.shapeMiss.add(feature);
+      console.warn(`[roam-backlinks] ${feature}: Obsidian's internal ${what} has changed, skipping this feature`);
+      if (this.shapeMiss.size === 1) new Notice(t("internalsChanged"));
+    }
+    return false;
   }
 
   applyAll() {
@@ -562,6 +598,8 @@ module.exports = class RoamBacklinks extends Plugin {
       // view.backlink：侧边栏反向链接面板；view.backlinks：笔记底部的反向链接
       for (const component of [view.backlink, view.backlinks]) {
         if (!component) continue;
+        const kids = component.backlinkDom && component.backlinkDom.vChildren && component.backlinkDom.vChildren._children;
+        if (!this.shapeOk("pane", Array.isArray(kids), "backlinks pane")) continue;
         component.__bdEmbedded = component === view.backlinks;
         component.__bdTarget = view.file || component.file || null;
         component.__bdTargetPath = component.__bdTarget ? component.__bdTarget.path : "";
@@ -630,15 +668,17 @@ module.exports = class RoamBacklinks extends Plugin {
 
   // 反链里每一条命中（search-result-file-match）的类没有导出，只能从现成的实例上拿原型
   patchMatchRender(component) {
-    let match = null;
+    let match = null, seen = false;
     for (const dom of [component.backlinkDom, component.unlinkedDom]) {
       for (const fileDom of (dom && dom.vChildren && dom.vChildren._children) || []) {
         const m = fileDom.vChildren && fileDom.vChildren._children && fileDom.vChildren._children[0];
-        if (m && typeof m.render === "function" && "start" in m && "cache" in m) { match = m; break; }
+        if (m) seen = true;
+        if (m && typeof m.render === "function" && "start" in m && "cache" in m && m.el) { match = m; break; }
       }
       if (match) break;
     }
-    if (!match) return;
+    // 有命中却认不出它的形状：Obsidian 改了这个内部类，命中处渲染、面包屑、就地编辑这些都不做
+    if (!match) { if (seen) this.shapeOk("render", false, "search result match"); return; }
     const proto = Object.getPrototypeOf(match);
     if (proto.__bdAncestors) { this.matchProto = proto; return; }
     const plugin = this;
@@ -653,8 +693,31 @@ module.exports = class RoamBacklinks extends Plugin {
     proto.__bdAncestors = true;
     this.matchProto = proto;
     this.origRender = orig;
+    this.register(() => { proto.render = orig; delete proto.__bdAncestors; });
     this.rerenderAll();
   }
+
+  dropMatchComp(m) {
+    if (m.__bdComp) this.removeChild(m.__bdComp);   // removeChild 会顺带 unload
+    m.__bdComp = null;
+    this.matchComps.delete(m);
+  }
+
+  // 面板重算、换页、关掉以后，旧的命中对象就没人用了（虚拟滚动只是把它的 el 摘下来，对象还在 vChildren 里，不算丢）。
+  // 不在任何反链面板 vChildren 里的命中，卸载它的 Component，免得里面嵌入、链接预览注册的事件一直挂着。
+  // 已经关掉的面板，它的补丁不用再还原：把登记的还原一并丢掉，不留着那些对象的引用
+  sweepStale() {
+    if (this.unloaded) return;
+    const live = new Set(), owners = new Set();
+    this.eachComponent((c) => {
+      owners.add(c);
+      for (const dom of [c.backlinkDom, c.unlinkedDom]) { if (dom) owners.add(dom); this.eachMatch(dom, (m) => live.add(m)); }
+    });
+    for (const m of [...this.matchComps]) if (!live.has(m)) this.dropMatchComp(m);
+    this.undoList = this.undoList.filter((u) => owners.has(u.owner));
+  }
+
+  clearRelationCache() { this._df = null; this._udf = null; this._tags = null; }
 
   rerenderAll() {
     this.app.workspace.iterateAllLeaves((leaf) => {
@@ -921,7 +984,7 @@ module.exports = class RoamBacklinks extends Plugin {
       m.el.toggleClass("bd-hidden", !this.matchVisible(comp, m));
       this.refresh(comp);
     }
-    if (S.freezeAfterLink && comp && dom === comp.unlinkedDom) this.takeOverLinkButton(m, comp);
+    if (S.freezeAfterLink && comp && dom === comp.unlinkedDom && this.canFreeze(comp)) this.takeOverLinkButton(m, comp);
   }
 
   // ---------- 「转为链接」之后不刷新 ----------
@@ -934,8 +997,13 @@ module.exports = class RoamBacklinks extends Plugin {
   }
 
   // 冻结：把 Obsidian 反链面板的两个更新队列换成空的，文件改动、元数据变化都不再触发重算和重排
+  canFreeze(c) {
+    const q = (x) => x && typeof x.add === "function";
+    return this.shapeOk("freeze", (c.__bdFrozen || (q(c.backlinkQueue) && q(c.unlinkedQueue))) && typeof c.recomputeBacklink === "function" && typeof c.recomputeUnlinked === "function", "backlinks update queue");
+  }
   freeze(c) {
     if (c.__bdFrozen) return;
+    this.undoOn(c, () => this.thaw(c, true), "freeze");
     const dummy = { add() {}, remove() {}, runnable: { isCancelled: () => true, cancel() {} } };
     c.__bdQueues = { b: c.backlinkQueue, u: c.unlinkedQueue, dummy };
     c.backlinkQueue = dummy;
@@ -1064,24 +1132,28 @@ module.exports = class RoamBacklinks extends Plugin {
   }
 
   // 文件标题行：只有标题文字（和折叠小三角）能点开文件，行里其他地方是空白，点了什么也不做
+  // 只给行打个记号；点击由 onTitleRowClick 在 document 上统一接（插件卸载时监听跟着摘掉，行上不留处理器）
   shrinkTitleHitArea(fileDom) {
     const row = fileDom && fileDom.selfEl;
-    if (!row || row.__bdTitleBound) return;
-    row.__bdTitleBound = true;
+    if (!row) return;
+    row.__bdFileDom = fileDom;
     row.addClass("bd-title-row");
-    row.addEventListener("click", (e) => {
-      const t = e.target;
-      if (t.closest && t.closest(".tree-item-inner, .collapse-icon")) {
-        if (S.shiftStack && e.shiftKey && t.closest(".tree-item-inner")) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          this.openStackedFile(fileDom.file, -1);
-        }
-        return;
+  }
+  onTitleRowClick(e) {
+    const t = e.target;
+    const row = t && t.closest && t.closest(".bd-title-row");
+    const fileDom = row && row.__bdFileDom;
+    if (!fileDom) return;
+    if (t.closest(".tree-item-inner, .collapse-icon")) {
+      if (S.shiftStack && e.shiftKey && t.closest(".tree-item-inner")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        this.openStackedFile(fileDom.file, -1);
       }
-      e.preventDefault();
-      e.stopImmediatePropagation();   // 捕获阶段拦下，原来「点整行打开文件」的处理器收不到
-    }, true);
+      return;
+    }
+    e.preventDefault();
+    e.stopImmediatePropagation();   // 捕获阶段拦下，原来「点整行打开文件」的处理器收不到
   }
 
   // ---------- 就地编辑 ----------
@@ -1121,37 +1193,41 @@ module.exports = class RoamBacklinks extends Plugin {
     });
     m.el.appendChild(btn);
     m.el.addClass("bd-click-edit");
-    if (m.__bdClickBound) return;
-    m.__bdClickBound = true;
-    // 捕获阶段先拦下，preventDefault 后原来的「跳到原文」处理器会自己跳过
-    m.el.addEventListener("click", (e) => {
-      const t = e.target;
-      // Shift 点空白处 = 把这一块的原文在右侧栏叠放一页（点链接/按钮等交给它们自己的处理器）
-      if (S.shiftStack && e.button === 0 && e.shiftKey && !e.metaKey && !e.ctrlKey) {
-        if (t.closest && t.closest(".bd-jump-btn, .bd-expand, .bd-ctl, .search-result-hover-button, .search-result-file-match-replace-button, .bd-crumbs a, .bd-crumb, .bd-md a, .bd-md input, .bd-refcount")) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        this.openStackedFile(m.parentDom.file, this.offsetToLine(m, (m.__bdRange || {}).start));
-        return;
-      }
-      if (m.el.hasClass("bd-editing")) return;
-      // ⌘ 点空白处 = 跳到原文（新标签），居中并选中命中的那一行；链接、面包屑等交给它们自己的处理器
-      if (e.button === 0 && (e.metaKey || e.ctrlKey)) {
-        if (t.closest && t.closest(".bd-jump-btn, .bd-expand, .bd-ctl, .search-result-hover-button, .search-result-file-match-replace-button, .bd-crumbs, .bd-md a, .bd-md input, .bd-refcount")) return;
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        this.openAt(file, this.hitLine(m), Keymap.isModEvent(e));
-        return;
-      }
-      if (!S.inlineEdit) return;
-      if (e.button !== 0) return;
-      // 链接、标签、复选框、面包屑、「链接」按钮各有各的处理，不进编辑
-      if (t.closest && t.closest(".bd-jump-btn, .bd-expand, .bd-ctl, .search-result-hover-button, .search-result-file-match-replace-button, .bd-crumbs, .bd-md a, .bd-md input")) return;
+    m.el.__bdMatch = m;   // 点击由 onMatchClick 在 document 上统一接
+  }
+
+  // 捕获阶段先拦下，preventDefault 后原来的「跳到原文」处理器会自己跳过
+  onMatchClick(e) {
+    const t = e.target;
+    const el = t && t.closest && t.closest(".bd-click-edit");
+    const m = el && el.__bdMatch;
+    const file = m && m.parentDom && m.parentDom.file;
+    if (!file || m.el !== el) return;
+    // Shift 点空白处 = 把这一块的原文在右侧栏叠放一页（点链接/按钮等交给它们自己的处理器）
+    if (S.shiftStack && e.button === 0 && e.shiftKey && !e.metaKey && !e.ctrlKey) {
+      if (t.closest(".bd-jump-btn, .bd-expand, .bd-ctl, .search-result-hover-button, .search-result-file-match-replace-button, .bd-crumbs a, .bd-crumb, .bd-md a, .bd-md input, .bd-refcount")) return;
       e.preventDefault();
-      const sel = window.getSelection();
-      if (sel && !sel.isCollapsed && m.el.contains(sel.anchorNode)) return;   // 在选文字，不进编辑
-      this.startEdit(m, m.__bdCtx);
-    }, true);
+      e.stopImmediatePropagation();
+      this.openStackedFile(file, this.offsetToLine(m, (m.__bdRange || {}).start));
+      return;
+    }
+    if (m.el.hasClass("bd-editing")) return;
+    // ⌘ 点空白处 = 跳到原文（新标签），居中并选中命中的那一行；链接、面包屑等交给它们自己的处理器
+    if (e.button === 0 && (e.metaKey || e.ctrlKey)) {
+      if (t.closest(".bd-jump-btn, .bd-expand, .bd-ctl, .search-result-hover-button, .search-result-file-match-replace-button, .bd-crumbs, .bd-md a, .bd-md input, .bd-refcount")) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      this.openAt(file, this.hitLine(m), Keymap.isModEvent(e));
+      return;
+    }
+    if (!S.inlineEdit) return;
+    if (e.button !== 0) return;
+    // 链接、标签、复选框、面包屑、「链接」按钮各有各的处理，不进编辑
+    if (t.closest(".bd-jump-btn, .bd-expand, .bd-ctl, .search-result-hover-button, .search-result-file-match-replace-button, .bd-crumbs, .bd-md a, .bd-md input")) return;
+    e.preventDefault();
+    const sel = (e.view || window).getSelection();
+    if (sel && !sel.isCollapsed && m.el.contains(sel.anchorNode)) return;   // 在选文字，不进编辑
+    this.startEdit(m, m.__bdCtx);
   }
 
   startEdit(m, ctx) {
@@ -1355,9 +1431,10 @@ module.exports = class RoamBacklinks extends Plugin {
       box.after(tog);
     }
 
-    if (m.__bdComp) m.__bdComp.unload();
-    const comp = (m.__bdComp = new Component());
-    comp.load();
+    this.dropMatchComp(m);
+    const comp = (m.__bdComp = this.addChild(new Component()));
+    this.matchComps.add(m);
+    this.sweepSoon();
     const token = (m.__bdToken = (m.__bdToken || 0) + 1);
     const sourcePath = m.parentDom && m.parentDom.file ? m.parentDom.file.path : "";
     MarkdownRenderer.render(this.app, md, box, sourcePath, comp).then(() => {
@@ -1846,7 +1923,15 @@ module.exports = class RoamBacklinks extends Plugin {
   // 给结果列表换上自己的比较函数（原生 onChange 只是按 sortOrder 排 vChildren 再刷新滚动）
   hookSort(dom) {
     if (dom.__bdSorted) return;
+    const v = dom.vChildren;
+    if (!this.shapeOk("sort", v && typeof v.sort === "function" && typeof v.hasChildren === "function" && dom.emptyStateEl
+      && dom.infinityScroll && typeof dom.infinityScroll.queueCompute === "function", "backlinks result list")) return;
     dom.__bdSorted = true;
+    this.undoOn(dom, () => {
+      delete dom.onChange; delete dom.__bdSorted; delete dom.__bdSortChanged;
+      this.eachFileDom(dom, (fd) => { fd.el.querySelectorAll(":scope > .bd-heads").forEach((x) => x.remove()); fd.el.removeClass("bd-year-fold", "bd-year-hidden"); });
+      try { dom.onChange(); } catch (e) { /* 面板已关 */ }
+    });
     const plugin = this;
     dom.onChange = function () {
       const c = this.__bdComponent;
@@ -1955,17 +2040,18 @@ module.exports = class RoamBacklinks extends Plugin {
 
   // 结果列表每次加/删结果都会调 changed()；包一层，顺便刷新共现统计
   hookChanged(dom) {
-    if (dom.__bdHooked || typeof dom.changed !== "function") return;
+    if (dom.__bdHooked || !this.shapeOk("refresh", typeof dom.changed === "function", "result list refresh")) return;
     dom.__bdHooked = true;
     const plugin = this, orig = dom.changed;
-    dom.__bdOrigChanged = orig;   // 卸载时还原
-    dom.changed = function (...args) {
+    const wrapped = dom.changed = function (...args) {
       // 换了排序时走自己的（原生的 changed 在构造时就绑死了原生 onChange，会按文件名重排、冲掉自定义排序）
       const r = this.__bdSortChanged ? this.__bdSortChanged() : orig.apply(this, args);
       const c = this.__bdComponent;
       if (!plugin.unloaded && c && c.__bd) plugin.refresh(c);
+      if (!plugin.unloaded) plugin.sweepSoon();
       return r;
     };
+    this.undoOn(dom, () => { if (dom.changed === wrapped) dom.changed = orig; delete dom.__bdHooked; });
   }
 
   // 反链是懒渲染的：文件条目滚进视口才生成命中条目（vChildren）。共现统计、分组、按文件隐藏都要覆盖全部，
@@ -2135,9 +2221,10 @@ module.exports = class RoamBacklinks extends Plugin {
   }
 
   setupToolbar(component, rootEl) {
+    this.undoOn(component, () => component.__bdToolbar && component.__bdToolbar.remove(), "toolbar");
     let bar = component.__bdToolbar;
     if (bar && bar.isConnected) return;
-    if (bar) { bar.remove(); const i = this.toolbars.indexOf(bar); if (i >= 0) this.toolbars.splice(i, 1); }
+    if (bar) bar.remove();
     bar = createDiv({ cls: "bd-toolbar" });
     const row = bar.createDiv({ cls: "bd-toolbar-row" });
     if (S.showCooccur) {
@@ -2172,7 +2259,6 @@ module.exports = class RoamBacklinks extends Plugin {
     component.__bdGroups = bar.createDiv({ cls: "bd-groups" });
     rootEl.insertBefore(bar, rootEl.firstChild);
     component.__bdToolbar = bar;
-    this.toolbars.push(bar);
   }
 
   // 名字按钮：只有当前页有别名时才出现。次数分「链接 / 提到」两列统计（「提到当前文件名」折叠时 Obsidian 不算它，次数为 0）
@@ -2413,6 +2499,31 @@ module.exports = class RoamBacklinks extends Plugin {
     }
     this.blockSrc.set(f.path, keys);
     for (const k of keys) this.blockCounts.set(k, (this.blockCounts.get(k) || 0) + 1);
+  }
+  // 改名 / 移动：只重算这篇自己、引用过它的块的那些篇，以及原来有指向新名字的悬空链接的那些篇，不再全库重建。
+  // 改文件夹名时逐个处理里面的笔记（Obsidian 之后还会为每篇单独发 rename，重复处理一次也没关系）
+  renameInIndex(file, oldPath) {
+    if (!this.blockCounts) return;
+    const pairs = [];
+    const walk = (af, old) => {
+      if (af.children) for (const ch of af.children) walk(ch, old + "/" + ch.name);
+      else if (af.extension === "md") pairs.push([af, old]);
+    };
+    walk(file, oldPath);
+    if (!pairs.length) return;
+    const redo = new Set();
+    const unresolved = this.app.metadataCache.unresolvedLinks || {};
+    for (const [f, old] of pairs) {
+      const prefix = old + "#^", names = [f.basename, f.path.replace(/\.md$/, "")];
+      for (const [src, keys] of this.blockSrc) if (src !== old && keys.some((k) => k.startsWith(prefix))) redo.add(src);
+      for (const src in unresolved) if (names.some((n) => unresolved[src][n])) redo.add(src);
+      this.removeFile(old);
+      redo.add(f.path);
+    }
+    for (const p of redo) {
+      const f = this.app.vault.getAbstractFileByPath(p);
+      if (f && f.extension === "md") this.indexFile(f);
+    }
   }
   addRefBadges(m, range) {
     if (!this.blockCounts) return;

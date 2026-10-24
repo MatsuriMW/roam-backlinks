@@ -125,10 +125,13 @@ body .backlink-pane .tree-item-self.is-clickable.bd-title-row:hover { background
   font-size: var(--font-ui-smaller);
   padding: 2px 6px; height: auto;
 }
-.bd-filter-toggle, .bd-filter-clear, .bd-group-toggle {
+.bd-filter-toggle, .bd-filter-clear, .bd-group-toggle, .bd-words-toggle {
   font-size: var(--font-ui-smaller);
   padding: 2px 8px; height: auto; box-shadow: none; cursor: var(--cursor);
 }
+.bd-words-toggle.is-active { background: var(--interactive-accent); color: var(--text-on-accent); }
+.bd-words { margin-top: 6px; padding-top: 4px; border-top: 1px dashed var(--background-modifier-border); }
+.bd-words-head { font-size: var(--font-ui-smaller); color: var(--text-faint); }
 .bd-filter-clear { color: var(--text-muted); }
 /* 没东西可清时变灰但占着位置，免得文字框被挤来挤去 */
 .bd-filter-clear.is-idle { opacity: 0.4; cursor: default; }

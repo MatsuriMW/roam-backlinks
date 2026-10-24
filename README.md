@@ -22,6 +22,7 @@ Obsidian's backlinks panel shows a line or two of plain text around each link. I
 - **Daily notes grouped by date.** Daily notes come after pages, newest first. The last 12 months are grouped by month, older ones fold by year. Folder and date format are read from the core Daily notes plugin, or set your own.
 - **Co-mention filter (like Roam).** See which other pages are mentioned alongside this one, ranked so that specific pages beat ones that appear everywhere. Click to show only blocks with a page, `Shift`-click to exclude it.
 - **Group.** Cluster the backlinks by their strongest co-mentioned pages to scan the themes at a glance.
+- **Word stats, per note.** Turn on “Words” for a note to see the frequent words in its backlinks, ranked by how specific they are to this note (count × vault-wide rarity), and the word pairs that tend to appear together. Click a word or pair to show only those blocks. It stays off unless you turn it on for that note. Words come from the browser's own segmenter, with your note names and aliases as an extra dictionary, so Chinese and other languages without spaces work too.
 - **Filter by name.** When a note has aliases, see which name each backlink uses and filter by it.
 - **Text filter** for the backlinks at the bottom of notes.
 - **Unlinked mentions that don't jump.** Clicking “Link” converts the mention without refreshing or re-sorting the panel, so you keep your place. Optional case-sensitive matching per note through a property.
@@ -45,6 +46,7 @@ Every feature can be turned off in **Settings → Roam Backlinks**: blocks, edit
 
 - **Jump to backlinks of the current note** (no default hotkey): scrolls to the backlinks at the bottom of the note and focuses the filter box, or reveals the sidebar panel.
 - **Toggle case-sensitive unlinked mentions for this note**: writes the property to the current note.
+- **Toggle word stats for the current note**.
 
 ## Installation
 
@@ -87,6 +89,7 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 
 - 页面按关系紧密度排在前（互链 > 属性里链过来 > 提到次数），日记在后按日期从新到旧，最近 12 个月按月分段，更早的按年折叠。日记的文件夹和日期格式读核心插件「日记」的设置，也可以自己填。
 - 共现筛选（Roam 式）、分组、按别名筛选、正文底部的文字筛选框。
+- **按页开的词频**：对某一页点「词频」，列出它反链里的特征词（次数 × 全库稀有度）和常一起出现的词对，点一下只看含它们的块。默认不开，每页单独记住。分词用系统自带的分词器，再拿库里的页面名和别名当词典补专名。
 - 「转为链接」后面板不刷新、不重排，阅读位置不变；可以按笔记设置区分大小写。
 
 **导出 PDF 带上反链**：自带的「导出为 PDF」对话框里多出「包含反链」和「排版」（精致排版、字体、字号、强调色）。一篇概念页能连同库里所有提到它的地方一起导出。

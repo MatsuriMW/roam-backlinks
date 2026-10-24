@@ -77,6 +77,16 @@ const STRINGS = {
     clusterOn: "Showing only this cluster · click to cancel",
     clusterOff: "Show only this cluster (the backlinks below follow)",
     refTip: (n) => `Referenced ${n} times · click to see where`,
+    words: "Words",
+    wordsBtnTip: "Word stats for this note: frequent words and word pairs in its backlinks (remembered per note)",
+    cmdWords: "Toggle word stats for the current note",
+    wordsOn: "Word stats on for this note",
+    wordsOff: "Word stats off for this note",
+    wordsHead: (n, ready) => `In ${n} backlinks${ready ? " · ranked by distinctiveness" : " · counting the vault…"}`,
+    wordsPairs: "Pairs",
+    wordsNone: "Not enough text in the backlinks",
+    wordTip: (count, s) => `In ${count} backlinks · distinctiveness ${s} · Click: only blocks with it`,
+    pairTip: (c, a, b) => `Together in ${c} backlinks (${a} and ${b} on their own) · Click: only blocks with both`,
   },
   zh: {
     cmdToggleCase: "切换：「提到当前文件名」区分大小写（写进当前笔记属性）",
@@ -142,6 +152,16 @@ const STRINGS = {
     clusterOn: "正在只看这簇 · 点=取消",
     clusterOff: "只看这簇（下面的反链也跟着收成这一簇）",
     refTip: (n) => `这一块被引用 ${n} 次 · 点开看谁引用`,
+    words: "词频",
+    wordsBtnTip: "这一页的词频：反链里的高频词和一起出现的词对（按页记住开关）",
+    cmdWords: "开关当前页的词频",
+    wordsOn: "这一页开了词频",
+    wordsOff: "这一页关了词频",
+    wordsHead: (n, ready) => `${n} 条反链${ready ? " · 按特征度排" : " · 正在统计全库…"}`,
+    wordsPairs: "词对",
+    wordsNone: "反链里的文字太少，统计不出来",
+    wordTip: (count, s) => `出现在 ${count} 条反链里 · 特征度 ${s} · 点=只看含它的`,
+    pairTip: (c, a, b) => `同时出现在 ${c} 条反链里（各自 ${a}、${b} 条）· 点=只看两词都有的`,
   },
 };
 const t = (key, ...args) => {
@@ -184,6 +204,9 @@ const DEFAULTS = {
   textFilter: true,
   nameFilter: true,
   caseProperty: "case-sensitive",
+  // 词频：工具栏放「词频」按钮，按页开关（开过的页记在 wordStatsPages 里），不是每页常驻
+  wordStats: true,
+  wordStatsPages: [],
   // 导航：Shift 点在右侧栏叠放（列表块用 Bullet / Zoom 插件聚焦进去）、块引用计数
   shiftStack: true,
   stackZoom: true,
@@ -210,6 +233,73 @@ const folderPrefix = (f) => { f = String(f || "").trim().replace(/^\/+|\/+$/g, "
 const hideFolders = () => String(S.hideFolders || "").split(/[\n,]/).map(folderPrefix).filter(Boolean);
 const sepFolder = () => folderPrefix(S.separateFolder);
 const caseKeys = () => [...new Set([String(S.caseProperty || "").trim() || "case-sensitive", "case-sensitive"])];
+
+// ---------- 词频：用自带的 Intl.Segmenter 分词（中英文都能分），去掉停用词 ----------
+const STOP_WORDS = new Set((
+  "一个 一些 一下 一点 一种 一样 一直 一起 一次 没有 我们 你们 他们 她们 它们 自己 这个 那个 这些 那些 这样 那样 这么 那么 这种 那种 这里 那里 哪里 什么 怎么 怎样 为什么 " +
+  "因为 所以 但是 如果 然后 还是 已经 可以 就是 不是 还有 只是 而且 或者 不过 虽然 因此 于是 并且 然而 其实 应该 可能 需要 觉得 知道 现在 时候 之后 以后 之前 以前 " +
+  "今天 明天 昨天 非常 比较 很多 不要 不会 不能 有点 有些 出来 起来 进行 通过 关于 对于 以及 等等 东西 事情 问题 方面 情况 部分 所有 每个 直接 主要 之类 感觉 " +
+  "比如 的话 都是 也是 就是 而是 只有 之间 一般 其他 别人 更加 特别 目前 当时 同时 甚至 本身 另外 一定 完全 确实 真的 好像 这次 还会 还能 能够 或许 也许 大概 左右 如何 是否 为了 其中 这是 那是 就会 都有 有的 一件 一条 一样 这一 那一 " +
+  "the and for are but not you all any can had her was one our out has have this that with from they will would there their what when which been were into than then them " +
+  "these those some such just also more most other only over very about after before because could should while where your its get got like how why who todo doing done later " +
+  "now failed canceled cancelled waiting paused scheduled deadline https http www com tok true false null suspended toreview 的是 不错 穿的"
+).split(" "));
+const CJK_RE = /[㐀-鿿]/;
+let segmenter = null;
+// 自带分词的词典不认识的专名（品牌、人名、术语）会被拆成单字，所以先用库里的页面名和别名做最长匹配，剩下的再分词
+let wordDict = new Set();
+const DICT_MAX = 8;
+function setWordDict(names) {
+  wordDict = new Set();
+  for (const n of names) { const w = String(n || "").trim().toLowerCase(); if (w.length >= 2 && w.length <= DICT_MAX && CJK_RE.test(w) && !/\s/.test(w)) wordDict.add(w); }
+}
+// 双链交给共现筛选，这里去掉；标签、网址、代码、块 ID、属性（key:: value）也去掉，剩下的分词
+function wordsOf(text) {
+  if (!segmenter) { try { segmenter = new Intl.Segmenter("zh", { granularity: "word" }); } catch (e) { return []; } }
+  let s = String(text || "")
+    .replace(/!?\[\[[^\]]*\]\]/g, " ")
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/`[^`]*`/g, " ")
+    .replace(/(^|\s)#[^\s#]+/g, " ")
+    .replace(/\^[\w-]+/g, " ")
+    .replace(/\[?[\w\u3400-\u9fff-]+::[^\]\n]*\]?/g, " ")
+    .toLowerCase();
+  const out = [];
+  if (wordDict.size) {
+    let rest = "";
+    for (let i = 0; i < s.length;) {
+      let hit = "";
+      if (CJK_RE.test(s[i])) for (let L = Math.min(DICT_MAX, s.length - i); L >= 2 && !hit; L--) if (wordDict.has(s.substr(i, L))) hit = s.substr(i, L);
+      if (hit) { if (!STOP_WORDS.has(hit)) out.push(hit); rest += " "; i += hit.length; } else rest += s[i++];
+    }
+    s = rest;
+  }
+  for (const seg of segmenter.segment(s)) {
+    const w = seg.segment;
+    if (!seg.isWordLike || /^[\d.,:%_-]+[a-z]{0,3}$/.test(w) || STOP_WORDS.has(w)) continue;
+    if (CJK_RE.test(w) ? w.length < 2 : w.length < 3) continue;
+    out.push(w);
+  }
+  return out;
+}
+// 词对：每条反链算一篇，c = 两个词同时出现的条数。按局部互信息 c·log2(c·D / (cA·cB)) 排，
+// 比只看 c 更能挑出「真的常一起说」的组合，而不是两个各自都很常见的词；只留 c ≥ 2
+function wordPairs(docs, words, limit) {
+  const df = new Map(words.map((w) => [w, 0]));
+  for (const d of docs) for (const w of d) if (df.has(w)) df.set(w, df.get(w) + 1);
+  const pairs = [];
+  for (let i = 0; i < words.length; i++) for (let j = i + 1; j < words.length; j++) {
+    const a = words[i], b = words[j];
+    if (a.includes(b) || b.includes(a)) continue;
+    let c = 0;
+    for (const d of docs) if (d.has(a) && d.has(b)) c++;
+    if (c < 2) continue;
+    const lmi = c * Math.log2((c * docs.length) / (df.get(a) * df.get(b)));
+    if (lmi > 0) pairs.push({ a, b, c, ca: df.get(a), cb: df.get(b), lmi });
+  }
+  return pairs.sort((x, y) => y.lmi - x.lmi).slice(0, limit);
+}
 
 // 字体候选：[英文名, 中文名, CSS 字体栈]。打开对话框时用画布量字宽，只列出本机装了的（按栈里第一个字体判断）
 const PDF_FONTS = [
@@ -364,6 +454,7 @@ const SETTING_ROWS = [
   ["rankByStrength", "toggle", "Rank co-mentions by strength", "Rare, specific pages rank above pages that appear everywhere.", "共现按紧密度排序", "专属的页面排在到处出现的高频页前面"],
   ["groupBacklinks", "toggle", "Group button", "Cluster backlinks by their strongest co-mentioned pages.", "分组按钮", "按最紧密的共现页把反链聚成簇"],
   ["groupMax", "number", "Maximum clusters", "", "最多分几簇", ""],
+  ["wordStats", "toggle", "Word stats button", "A “Words” button in the toolbar. Turn it on for a note to see the frequent words and word pairs in its backlinks; each note remembers its own switch.", "词频按钮", "工具栏里放一个「词频」按钮。对某一页打开后，列出它反链里的高频词和一起出现的词对；每页单独记住开关"],
   ["textFilter", "toggle", "Text filter under notes", "Add a filter box to the backlinks at the bottom of notes (the sidebar panel has its own).", "正文底部的文字筛选框", "给正文底部那份反链加一个筛选框（侧栏面板自带搜索）"],
   ["nameFilter", "toggle", "Filter by name", "When a note has aliases, filter backlinks by the name they use.", "名字筛选", "当前页有别名时，可以按用的是哪个名字筛选"],
   ["caseProperty", "text", "Case-sensitivity property", "Set this property to true in a note to show only unlinked mentions that match its name exactly. “case-sensitive” always works too.", "区分大小写的属性名", "笔记属性里把它设为 true，「提到当前文件」只显示大小写完全一致的写法。case-sensitive 也一直有效"],
@@ -493,6 +584,11 @@ module.exports = class RoamBacklinks extends Plugin {
     this.app.workspace.onLayoutReady(() => { if (S.blockRefcount) this.buildBlockIndex(); });
     this.registerEvent(this.app.metadataCache.on("deleted", (f) => { if (this.blockCounts) this.removeFile(f.path); }));
     this.registerEvent(this.app.vault.on("rename", (f, oldPath) => { if (this.blockCounts) this.renameInIndex(f, oldPath); }));
+    // 开了词频的页改名 / 移动：开关跟着走
+    this.registerEvent(this.app.vault.on("rename", (f, oldPath) => {
+      const i = (S.wordStatsPages || []).indexOf(oldPath);
+      if (i >= 0) { S.wordStatsPages[i] = f.path; this.saveSettings(); }
+    }));
 
     // 所有「某篇的元数据变了」都在这一处处理
     this.caseSig = new Map();
@@ -528,6 +624,16 @@ module.exports = class RoamBacklinks extends Plugin {
       id: "goto-backlinks",
       name: t("cmdGoto"),
       callback: () => this.gotoBacklinks(),
+    });
+    this.addCommand({
+      id: "toggle-word-stats",
+      name: t("cmdWords"),
+      checkCallback: (checking) => {
+        const f = this.app.workspace.getActiveFile();
+        if (!S.wordStats || !f || f.extension !== "md") return false;
+        if (!checking) this.toggleWordStats(f.path);
+        return true;
+      },
     });
 
     // 放在最后：布局已就绪时（比如重载插件）它会立刻执行，上面的初始化得先做完
@@ -608,6 +714,7 @@ module.exports = class RoamBacklinks extends Plugin {
         if (!component.__bd) component.__bd = { include: new Set(), exclude: new Set(), text: "", open: S.cooccurOpen, group: false, groupCollapsed: new Set() };
         component.__bd.nameInc = component.__bd.nameInc || new Set();
         component.__bd.nameExc = component.__bd.nameExc || new Set();
+        component.__bd.words = component.__bd.words || new Set();
         component.__bdNames = this.targetNames(component.__bdTarget);
         // 插件加载后第一次碰到这个面板：按默认值设一次「共现筛选」展开（之后你手动开关的会保留）
         if (!this.openInit.has(component)) { component.__bd.open = S.cooccurOpen; this.openInit.add(component); }
@@ -616,7 +723,7 @@ module.exports = class RoamBacklinks extends Plugin {
           // 离开了冻结时的那一页：解冻（Obsidian 换页时自己会整体重算）
           if (component.__bdFrozen) this.thaw(component, false);
           component.__bd.include.clear(); component.__bd.exclude.clear(); component.__bd.text = "";
-          component.__bd.nameInc.clear(); component.__bd.nameExc.clear();
+          component.__bd.nameInc.clear(); component.__bd.nameExc.clear(); component.__bd.words.clear();
           if (component.__bdInput) component.__bdInput.value = "";
           component.__bdPrevTarget = component.__bdTargetPath;
         }
@@ -629,7 +736,7 @@ module.exports = class RoamBacklinks extends Plugin {
         } else if (!component.__bdCollapseDone) {
           this.setCollapsed(component);   // 第一次时 DOM 可能还没画出来
         }
-        if (S.showCooccur || S.textFilter) {
+        if (S.showCooccur || S.textFilter || S.wordStats) {
           const rootEl = component.__bdEmbedded
             ? view.containerEl && view.containerEl.querySelector(".embedded-backlinks")
             : (view.containerEl && view.containerEl.querySelector(".backlink-pane")) || view.containerEl;
@@ -2129,6 +2236,7 @@ module.exports = class RoamBacklinks extends Plugin {
       for (const f of forms) if (st.nameExc.has(f)) return false;
     }
     if (st.text && !this.matchText(m).includes(st.text)) return false;
+    if (st.words && st.words.size) { const txt = this.matchText(m); for (const w of st.words) if (!txt.includes(w)) return false; }
     if (st.include.size || st.exclude.size) {
       const pages = this.matchPages(m, component.__bdTargetPath);
       for (const k of st.include) if (!pages.has(k)) return false;
@@ -2140,7 +2248,7 @@ module.exports = class RoamBacklinks extends Plugin {
   applyFilter(component) {
     const st = component.__bd;
     if (!st) return;
-    const active = !!(st.text || st.include.size || st.exclude.size || (st.nameInc && st.nameInc.size) || (st.nameExc && st.nameExc.size));
+    const active = !!(st.text || st.include.size || st.exclude.size || (st.nameInc && st.nameInc.size) || (st.nameExc && st.nameExc.size) || (st.words && st.words.size));
     for (const dom of [component.backlinkDom, component.unlinkedDom]) {
       if (!dom) continue;
       this.eachFileDom(dom, (fd) => {
@@ -2177,6 +2285,7 @@ module.exports = class RoamBacklinks extends Plugin {
       if (S.nameFilter) this.refreshNameChips(component);
       if (S.showCooccur) this.refreshChips(component, data);
       if (S.groupBacklinks) this.renderGroups(component, data);
+      if (S.wordStats) this.refreshWords(component);
       this.applyFilter(component);
     } catch (e) { console.error("[roam-backlinks] filter", e); }
   }
@@ -2237,11 +2346,17 @@ module.exports = class RoamBacklinks extends Plugin {
       gb.addEventListener("click", (e) => { e.preventDefault(); component.__bd.group = !component.__bd.group; gb.toggleClass("is-active", component.__bd.group); this.refreshNow(component); });
       component.__bdGroupBtn = gb;
     }
+    if (S.wordStats) {
+      const wb = row.createEl("button", { cls: "bd-words-toggle", text: t("words"), attr: { "aria-label": t("wordsBtnTip") } });
+      wb.addEventListener("click", (e) => { e.preventDefault(); this.toggleWordStats(component.__bdTargetPath); });
+      component.__bdWordsBtn = wb;
+    }
     const clear = row.createEl("button", { cls: "bd-filter-clear", text: t("clear") });
     clear.addEventListener("click", (e) => {
       e.preventDefault();
       component.__bd.include.clear(); component.__bd.exclude.clear(); component.__bd.text = "";
       if (component.__bd.nameInc) { component.__bd.nameInc.clear(); component.__bd.nameExc.clear(); }
+      if (component.__bd.words) component.__bd.words.clear();
       if (component.__bdInput) component.__bdInput.value = "";
       this.refreshNow(component);
     });
@@ -2256,6 +2371,7 @@ module.exports = class RoamBacklinks extends Plugin {
     component.__bdNameBar = bar.createDiv({ cls: "bd-names" });
     component.__bdWiki = bar.createDiv({ cls: "bd-wiki" });
     component.__bdChips = bar.createDiv({ cls: "bd-chips" });
+    component.__bdWords = bar.createDiv({ cls: "bd-words" });
     component.__bdGroups = bar.createDiv({ cls: "bd-groups" });
     rootEl.insertBefore(bar, rootEl.firstChild);
     component.__bdToolbar = bar;
@@ -2325,6 +2441,103 @@ module.exports = class RoamBacklinks extends Plugin {
     return !!(sepFolder() && fd && fd.file && fd.file.path.startsWith(sepFolder()));
   }
 
+  // ---------- 词频（按页开关） ----------
+  wordStatsOn(path) {
+    return !!path && (S.wordStatsPages || []).includes(path);
+  }
+  toggleWordStats(path) {
+    if (!path) return;
+    const on = !this.wordStatsOn(path);
+    S.wordStatsPages = (S.wordStatsPages || []).filter((p) => p !== path);
+    if (on) S.wordStatsPages.push(path);
+    this.saveSettings();
+    new Notice(on ? t("wordsOn") : t("wordsOff"));
+    this.eachComponent((c) => { if (c.__bdTargetPath === path) { if (!on && c.__bd) c.__bd.words.clear(); this.refreshNow(c); } });
+  }
+  // 全库每个词出现在几篇笔记里（特征度的 idf）。第一次有页面打开词频时在后台算一遍，分批让出主线程；算好前先按次数排
+  // 分词词典：库里所有页面名 + 别名，换库内容后下次打开词频时重建
+  ensureWordDict() {
+    const files = this.app.vault.getMarkdownFiles();
+    if (this._wordDictN === files.length) return;
+    const names = [];
+    for (const f of files) {
+      names.push(f.basename);
+      const fm = (this.app.metadataCache.getFileCache(f) || {}).frontmatter;
+      const al = fm && (fm.aliases || fm.alias);
+      if (al) names.push(...(Array.isArray(al) ? al : String(al).split(",")));
+    }
+    setWordDict(names);
+    this._wordDictN = files.length;
+  }
+  wordBg() {
+    if (this._wordBg || this._wordBgBusy) return this._wordBg;
+    this._wordBgBusy = true;
+    (async () => {
+      const df = new Map();
+      const files = this.app.vault.getMarkdownFiles();
+      for (let i = 0; i < files.length; i++) {
+        if (this.unloaded) return;
+        try { for (const w of new Set(wordsOf(await this.app.vault.cachedRead(files[i])))) df.set(w, (df.get(w) || 0) + 1); } catch (e) {}
+        if (i % 40 === 39) await wait(0);
+      }
+      this._wordBg = { df, N: files.length };
+      this._wordBgBusy = false;
+      this.eachComponent((c) => { if (this.wordStatsOn(c.__bdTargetPath)) this.refreshNow(c); });
+    })();
+    return null;
+  }
+  refreshWords(component) {
+    const box = component.__bdWords, st = component.__bd;
+    const on = this.wordStatsOn(component.__bdTargetPath);
+    if (component.__bdWordsBtn) component.__bdWordsBtn.toggleClass("is-active", on);
+    if (!box) return;
+    box.empty();
+    box.toggle(on);
+    if (!on) return;
+    this.ensureWordDict();
+    // 每条反链一篇；当前页自己的名字（含别名）不算
+    const own = new Set();
+    for (const n of component.__bdNames || []) { own.add(n.toLowerCase()); for (const w of wordsOf(n)) own.add(w); }
+    const docs = [];
+    this.eachFileDom(component.backlinkDom, (fd) => { if (this.isWiki(fd)) return; for (const m of this.fileMatches(fd)) docs.push(new Set(wordsOf(this.matchText(m)).filter((w) => !own.has(w)))); });
+    const count = new Map();
+    for (const d of docs) for (const w of d) count.set(w, (count.get(w) || 0) + 1);
+    const bg = this.wordBg();
+    const score = (w, c) => bg ? c * Math.log(1 + bg.N / Math.max(1, bg.df.get(w) || 1)) : c;
+    // 只出现一次的词不进榜（反链少于 5 条时放宽）
+    const minC = docs.length < 5 ? 1 : 2;
+    const ranked = [...count].filter(([, c]) => c >= minC).map(([w, c]) => ({ w, c, s: score(w, c) })).sort((a, b) => b.s - a.s || b.c - a.c);
+    box.createDiv({ cls: "bd-words-head", text: t("wordsHead", docs.length, !!bg) });
+    if (!ranked.length) { box.createDiv({ cls: "bd-words-head", text: t("wordsNone") }); return; }
+    const chips = box.createDiv({ cls: "bd-chips" });
+    for (const { w, c, s } of ranked.slice(0, 30)) {
+      const chip = chips.createSpan({ cls: "bd-chip" });
+      chip.toggleClass("bd-chip-inc", st.words.has(w));
+      chip.createSpan({ cls: "bd-chip-name", text: w });
+      chip.createSpan({ cls: "bd-chip-count", text: String(c) });
+      chip.setAttribute("aria-label", t("wordTip", c, s.toFixed(1)));
+      chip.addEventListener("click", (e) => { e.preventDefault(); if (st.words.has(w)) st.words.delete(w); else st.words.add(w); this.refreshNow(component); });
+    }
+    const pairs = wordPairs(docs, ranked.slice(0, 40).map((r) => r.w), 12);
+    if (!pairs.length) return;
+    const row = box.createDiv({ cls: "bd-chips" });
+    row.createSpan({ cls: "bd-names-label", text: t("wordsPairs") });
+    for (const p of pairs) {
+      const chip = row.createSpan({ cls: "bd-chip" });
+      chip.toggleClass("bd-chip-inc", st.words.size === 2 && st.words.has(p.a) && st.words.has(p.b));
+      chip.createSpan({ cls: "bd-chip-name", text: `${p.a} · ${p.b}` });
+      chip.createSpan({ cls: "bd-chip-count", text: String(p.c) });
+      chip.setAttribute("aria-label", t("pairTip", p.c, p.ca, p.cb));
+      chip.addEventListener("click", (e) => {
+        e.preventDefault();
+        const same = st.words.size === 2 && st.words.has(p.a) && st.words.has(p.b);
+        st.words.clear();
+        if (!same) { st.words.add(p.a); st.words.add(p.b); }
+        this.refreshNow(component);
+      });
+    }
+  }
+
   // 链到当前页的 wiki 页，列成一行入口：点=打开，⌘点=新标签，Shift点=右侧栏叠放
   renderWikiLinks(component) {
     const box = component.__bdWiki;
@@ -2349,7 +2562,7 @@ module.exports = class RoamBacklinks extends Plugin {
   updateClear(component) {
     const st = component.__bd, btn = component.__bdClear;
     if (!st || !btn) return;
-    const on = !!(st.include.size || st.exclude.size || st.text || (st.nameInc && st.nameInc.size) || (st.nameExc && st.nameExc.size));
+    const on = !!(st.include.size || st.exclude.size || st.text || (st.nameInc && st.nameInc.size) || (st.nameExc && st.nameExc.size) || (st.words && st.words.size));
     btn.toggleClass("is-idle", !on);
     btn.disabled = !on;
   }

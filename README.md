@@ -22,10 +22,39 @@ Obsidian's backlinks panel shows a line or two of plain text around each link. I
 - **Daily notes grouped by date.** Daily notes come after pages, newest first. The last 12 months are grouped by month, older ones fold by year. Folder and date format are read from the core Daily notes plugin, or set your own.
 - **Co-mention filter (like Roam).** See which other pages are mentioned alongside this one, ranked so that specific pages beat ones that appear everywhere. Click to show only blocks with a page, `Shift`-click to exclude it.
 - **Group.** Cluster the backlinks by their strongest co-mentioned pages to scan the themes at a glance.
-- **Word stats, per note.** Turn on “Words” for a note to see the frequent words in its backlinks, ranked by how specific they are to this note (count × vault-wide rarity), and the word pairs that tend to appear together. Click a word or pair to show only those blocks. It stays off unless you turn it on for that note. Words come from the browser's own segmenter, with your note names and aliases as an extra dictionary, so Chinese and other languages without spaces work too. Everything is computed on your device; the first time you turn it on, the vault-wide counts are built in the background (a few seconds for thousands of notes), and words are ranked by count until then.
+- **Word stats, per note.** Turn on “Words” for a note to see the distinctive words in its backlinks and the word pairs that tend to appear together, then click one to show only those blocks. See [Word stats](#word-stats).
 - **Filter by name.** When a note has aliases, see which name each backlink uses and filter by it.
 - **Text filter** for the backlinks at the bottom of notes.
 - **Unlinked mentions that don't jump.** Clicking “Link” converts the mention without refreshing or re-sorting the panel, so you keep your place. Optional case-sensitive matching per note through a property.
+
+## Word stats
+
+The co-mention filter shows which *pages* come up alongside this one. Word stats show which *words* do, including ones you never turned into links.
+
+**Where to find it.** Click **Words** in the backlinks toolbar (the row with *Co-mentions*, *Group* and *Clear*), in the sidebar panel or in the backlinks at the bottom of a note, or run *Toggle word stats for the current note*. It is off by default and each note remembers its own switch, so it only runs on the notes where you turn it on. A panel opens under the toolbar:
+
+- a header with the number of backlinks counted;
+- **distinctive words**, up to 30, most distinctive first. The number on each word is how many backlinks contain it; hover to see its score;
+- **Pairs**, up to 12: two words that often appear in the same backlink, with how many backlinks they share.
+
+**Using it.** Click a word to show only the backlinks that contain it. Click more words to keep only the backlinks that contain all of them; click a word again to drop it. Click a pair to show only the backlinks that contain both words. **Clear** resets everything. Word filters combine with the co-mention and text filters.
+
+**How words are ranked.** A word ranks high when many of this note's backlinks contain it and few other notes in the vault do:
+
+```
+score = backlinks containing the word × log(1 + notes in the vault ÷ notes containing the word)
+```
+
+For example, in a vault of 5,000 notes, on a note about clothes: *coat* is in 20 backlinks and in 40 notes overall, so it scores about 20 × 4.8 ≈ 97. *Good* is in 60 backlinks but in 3,000 notes, so it scores about 60 × 1.0 ≈ 59. *Good* is more frequent, but it is everywhere and says nothing about this note, so *coat* ranks first.
+
+- A word counts once per backlink, however often it repeats there.
+- The note's own name and aliases are left out.
+- Words found in only one backlink are skipped, unless the note has fewer than 5 backlinks.
+- The first time you turn it on, the vault-wide counts are built in the background (a few seconds for thousands of notes). Until then the header says “counting the vault…” and words are ranked by backlink count alone.
+
+**How pairs are ranked.** By local mutual information: how much more often the two words share a backlink than you would expect from how common each one is, so two words don't pair up just because both are common. A pair needs at least 2 shared backlinks.
+
+**What counts as a word.** Text is split by the browser's built-in word segmenter (`Intl.Segmenter`), with your note names and aliases as an extra dictionary, so Chinese and other languages without spaces work, and names such as brands stay whole. Links (they belong to the co-mention filter), tags, URLs, code, block IDs, `key:: value` properties, numbers and common stop words are ignored. Everything is computed on your device.
 
 ## Export to PDF with backlinks
 
@@ -89,8 +118,18 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 
 - 页面按关系紧密度排在前（互链 > 属性里链过来 > 提到次数），日记在后按日期从新到旧，最近 12 个月按月分段，更早的按年折叠。日记的文件夹和日期格式读核心插件「日记」的设置，也可以自己填。
 - 共现筛选（Roam 式）、分组、按别名筛选、正文底部的文字筛选框。
-- **按页开的词频**：对某一页点「词频」，列出它反链里的特征词（次数 × 全库稀有度）和常一起出现的词对，点一下只看含它们的块。默认不开，每页单独记住。分词用系统自带的分词器，再拿库里的页面名和别名当词典补专名。全部在本机算：第一次打开时在后台把全库统计一遍（几千篇的库几秒钟），算好前先按次数排。也可以用命令「开关当前页的词频」。
+- **按页开的词频**：对某一页点「词频」，列出它反链里的特征词和常一起出现的词对，点一下只看含它们的块。详见下面「词频」一节。
 - 「转为链接」后面板不刷新、不重排，阅读位置不变；可以按笔记设置区分大小写。
+
+**词频：反链里都在说什么**
+
+共现筛选告诉你哪些**页面**常和这一页一起出现；词频告诉你哪些**词**常和它一起出现，包括你从没加过双链的词。
+
+- **在哪里**：反链工具栏（「共现筛选 · 分组 · 词频 · 清除」那一排）里点「词频」，右侧栏的反链面板和正文底部的反链都有；也可以用命令「开关当前页的词频」。默认不开，每页单独记住开关，只在你打开的页上计算。打开后工具栏下面多出一块：第一行是统计了几条反链；然后是**特征词**（最多 30 个，越靠前越能代表这一页；词后的数字是它出现在几条反链里，悬停能看特征度）；再往下是**词对**（最多 12 对，经常出现在同一条反链里的两个词，数字是同时出现的条数）。
+- **怎么用**：点一个词，只看含它的反链；再点别的词，只看同时含这几个词的；再点一次取消。点一个词对，只看两个词都有的反链。「清除」全部复原。词频筛选可以和共现筛选、文字筛选叠加。
+- **特征词怎么排**：一个词在这一页的反链里出现得越多、在全库别处出现得越少，排得越前：`特征度 = 含这个词的反链条数 × log(1 + 全库笔记数 ÷ 含这个词的笔记数)`。例：全库 5000 篇，在「打扮」页，「大衣」出现在 20 条反链里、全库只有 40 篇有，特征度 ≈ 20 × 4.8 ≈ 97；「喜欢」出现在 60 条反链里，但全库 3000 篇都有，特征度 ≈ 60 × 1.0 ≈ 59。「喜欢」更常见，但哪儿都有，说明不了这一页的特点，所以「大衣」排在前面。同一条反链里重复多次只算一次；这一页自己的名字和别名不算；只在一条反链里出现的词不上榜（反链不到 5 条时除外）。第一次打开时要在后台统计全库（几千篇的库几秒钟），这期间第一行显示「正在统计全库…」，先只按出现在几条反链里排。
+- **词对怎么排**：按局部互信息，看两个词同时出现的条数比按它们各自多常见所预计的多出多少，所以两个词不会只因为各自都常见就凑成一对。至少要同时出现在 2 条反链里。
+- **怎么分词**：用系统自带的分词器（`Intl.Segmenter`），再拿库里的页面名和别名当词典，品牌、人名、术语这类专名不会被拆开。双链（交给共现筛选）、标签、网址、代码、块 ID、`key:: value` 属性、数字和常见虚词不算。全部在本机计算。
 
 **导出 PDF 带上反链**：自带的「导出为 PDF」对话框里多出「包含反链」和「排版」（精致排版、字体、字号、强调色）。一篇概念页能连同库里所有提到它的地方一起导出。
 

@@ -22,7 +22,7 @@ Obsidian's backlinks panel shows a line or two of plain text around each link. I
 - **Daily notes grouped by date.** Daily notes come after pages, newest first. The last 12 months are grouped by month, older ones fold by year. Folder and date format are read from the core Daily notes plugin, or set your own.
 - **Co-mention filter (like Roam).** See which other pages are mentioned alongside this one, ranked so that specific pages beat ones that appear everywhere. Click to show only blocks with a page, `Shift`-click to exclude it.
 - **Group.** Cluster the backlinks by their strongest co-mentioned pages to scan the themes at a glance.
-- **Word stats, per note.** Turn on “Words” for a note to see the frequent words in its backlinks, ranked by how specific they are to this note (count × vault-wide rarity), and the word pairs that tend to appear together. Click a word or pair to show only those blocks. It stays off unless you turn it on for that note. Words come from the browser's own segmenter, with your note names and aliases as an extra dictionary, so Chinese and other languages without spaces work too.
+- **Word stats, per note.** Turn on “Words” for a note to see the frequent words in its backlinks, ranked by how specific they are to this note (count × vault-wide rarity), and the word pairs that tend to appear together. Click a word or pair to show only those blocks. It stays off unless you turn it on for that note. Words come from the browser's own segmenter, with your note names and aliases as an extra dictionary, so Chinese and other languages without spaces work too. Everything is computed on your device; the first time you turn it on, the vault-wide counts are built in the background (a few seconds for thousands of notes), and words are ranked by count until then.
 - **Filter by name.** When a note has aliases, see which name each backlink uses and filter by it.
 - **Text filter** for the backlinks at the bottom of notes.
 - **Unlinked mentions that don't jump.** Clicking “Link” converts the mention without refreshing or re-sorting the panel, so you keep your place. Optional case-sensitive matching per note through a property.
@@ -40,7 +40,7 @@ Several plugins improve backlinks, and they are worth a look: Better Backlinks, 
 
 ## Settings
 
-Every feature can be turned off in **Settings → Roam Backlinks**: blocks, editing, sorting, filtering, navigation and PDF export. You can also choose the font for backlink blocks (Lyon Text by default, falling back to your text font), folders whose in-note backlinks are hidden, and a folder to list separately (for example an AI-maintained wiki).
+Every feature can be turned off in **Settings → Roam Backlinks**: blocks, editing, sorting, filtering, word stats, navigation and PDF export. You can also choose the font for backlink blocks (Lyon Text by default, falling back to your text font), folders whose in-note backlinks are hidden, and a folder to list separately (for example an AI-maintained wiki).
 
 ## Commands
 
@@ -58,7 +58,7 @@ Every feature can be turned off in **Settings → Roam Backlinks**: blocks, edit
 
 ## Notes
 
-- The plugin changes the built-in backlinks panel and Export to PDF dialog at runtime. It does not modify Obsidian's files; disabling the plugin restores everything. Because it builds on Obsidian's internal views, a future Obsidian update may require a plugin update.
+- The plugin changes the built-in backlinks panel and Export to PDF dialog at runtime. It does not modify Obsidian's files; disabling the plugin restores everything. Because it builds on Obsidian's internal views, a future Obsidian update may require a plugin update. If an update changes those internals, the affected features turn themselves off with a notice (details in the developer console) and the rest keep working.
 - Editing writes only the block you edited. If the note changed elsewhere in the meantime and the block can no longer be found, nothing is written and you are told.
 - The interface follows Obsidian's language: Chinese for Chinese, English otherwise.
 - Tested on desktop. It should work on mobile, but that is less tested; PDF export is desktop only, as in Obsidian.
@@ -89,11 +89,13 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 
 - 页面按关系紧密度排在前（互链 > 属性里链过来 > 提到次数），日记在后按日期从新到旧，最近 12 个月按月分段，更早的按年折叠。日记的文件夹和日期格式读核心插件「日记」的设置，也可以自己填。
 - 共现筛选（Roam 式）、分组、按别名筛选、正文底部的文字筛选框。
-- **按页开的词频**：对某一页点「词频」，列出它反链里的特征词（次数 × 全库稀有度）和常一起出现的词对，点一下只看含它们的块。默认不开，每页单独记住。分词用系统自带的分词器，再拿库里的页面名和别名当词典补专名。
+- **按页开的词频**：对某一页点「词频」，列出它反链里的特征词（次数 × 全库稀有度）和常一起出现的词对，点一下只看含它们的块。默认不开，每页单独记住。分词用系统自带的分词器，再拿库里的页面名和别名当词典补专名。全部在本机算：第一次打开时在后台把全库统计一遍（几千篇的库几秒钟），算好前先按次数排。也可以用命令「开关当前页的词频」。
 - 「转为链接」后面板不刷新、不重排，阅读位置不变；可以按笔记设置区分大小写。
 
 **导出 PDF 带上反链**：自带的「导出为 PDF」对话框里多出「包含反链」和「排版」（精致排版、字体、字号、强调色）。一篇概念页能连同库里所有提到它的地方一起导出。
 
 所有功能都能在设置里单独开关。界面语言跟随 Obsidian：中文界面显示中文，其余显示英文。
+
+插件在运行时改动自带的反链面板和「导出为 PDF」对话框，不改 Obsidian 本身的文件，停用即还原。Obsidian 更新如果改了这些内部结构，对不上的功能会自动关掉并提示一次（详情在开发者控制台），其余功能照常。
 
 安装：社区插件市场搜索「Roam Backlinks」（审核通过后）；或者从 [最新 Release](https://github.com/MatsuriMW/roam-backlinks/releases/latest) 下载 `main.js`、`manifest.json`、`styles.css` 放进 `<库>/.obsidian/plugins/roam-backlinks/`；或者用 BRAT 添加 `MatsuriMW/roam-backlinks`。

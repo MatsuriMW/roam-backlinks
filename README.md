@@ -31,6 +31,8 @@ Obsidian's backlinks panel shows a line or two of plain text around each link. I
 
 The co-mention filter shows which *pages* come up alongside this one. Word stats show which *words* do, including ones you never turned into links.
 
+![Word stats on a note about reinforcement learning: distinctive words and word pairs from its 16 backlinks](https://raw.githubusercontent.com/MatsuriMW/roam-backlinks/main/docs/word-stats-en.png)
+
 **Where to find it.** Click **Words** in the backlinks toolbar (the row with *Co-mentions*, *Group* and *Clear*), in the sidebar panel or in the backlinks at the bottom of a note, or run *Toggle word stats for the current note*. It is off by default and each note remembers its own switch, so it only runs on the notes where you turn it on. A panel opens under the toolbar:
 
 - a header with the number of backlinks counted;
@@ -50,7 +52,7 @@ For example, in a vault of 5,000 notes, on a note about clothes: *coat* is in 20
 - A word counts once per backlink, however often it repeats there.
 - The note's own name and aliases are left out.
 - Words found in only one backlink are skipped, unless the note has fewer than 5 backlinks.
-- The first time you turn it on, the vault-wide counts are built in the background (a few seconds for thousands of notes). Until then the header says “counting the vault…” and words are ranked by backlink count alone.
+- No model, no download, no index file. The first time word stats are shown after Obsidian starts, the plugin reads your notes once in the background to count how many notes contain each word (a few seconds for thousands of notes) and keeps the counts in memory only. Until then the header says “counting the vault…” and words are ranked by backlink count alone.
 
 **How pairs are ranked.** By local mutual information: how much more often the two words share a backlink than you would expect from how common each one is, so two words don't pair up just because both are common. A pair needs at least 2 shared backlinks.
 
@@ -125,9 +127,11 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 
 共现筛选告诉你哪些**页面**常和这一页一起出现；词频告诉你哪些**词**常和它一起出现，包括你从没加过双链的词。
 
+![「强化学习」页的词频：16 条反链里的特征词和词对](https://raw.githubusercontent.com/MatsuriMW/roam-backlinks/main/docs/word-stats-zh.png)
+
 - **在哪里**：反链工具栏（「共现筛选 · 分组 · 词频 · 清除」那一排）里点「词频」，右侧栏的反链面板和正文底部的反链都有；也可以用命令「开关当前页的词频」。默认不开，每页单独记住开关，只在你打开的页上计算。打开后工具栏下面多出一块：第一行是统计了几条反链；然后是**特征词**（最多 30 个，越靠前越能代表这一页；词后的数字是它出现在几条反链里，悬停能看特征度）；再往下是**词对**（最多 12 对，经常出现在同一条反链里的两个词，数字是同时出现的条数）。
 - **怎么用**：点一个词，只看含它的反链；再点别的词，只看同时含这几个词的；再点一次取消。点一个词对，只看两个词都有的反链。「清除」全部复原。词频筛选可以和共现筛选、文字筛选叠加。
-- **特征词怎么排**：一个词在这一页的反链里出现得越多、在全库别处出现得越少，排得越前：`特征度 = 含这个词的反链条数 × log(1 + 全库笔记数 ÷ 含这个词的笔记数)`。例：全库 5000 篇，在「打扮」页，「大衣」出现在 20 条反链里、全库只有 40 篇有，特征度 ≈ 20 × 4.8 ≈ 97；「喜欢」出现在 60 条反链里，但全库 3000 篇都有，特征度 ≈ 60 × 1.0 ≈ 59。「喜欢」更常见，但哪儿都有，说明不了这一页的特点，所以「大衣」排在前面。同一条反链里重复多次只算一次；这一页自己的名字和别名不算；只在一条反链里出现的词不上榜（反链不到 5 条时除外）。第一次打开时要在后台统计全库（几千篇的库几秒钟），这期间第一行显示「正在统计全库…」，先只按出现在几条反链里排。
+- **特征词怎么排**：一个词在这一页的反链里出现得越多、在全库别处出现得越少，排得越前：`特征度 = 含这个词的反链条数 × log(1 + 全库笔记数 ÷ 含这个词的笔记数)`。例：全库 5000 篇，在「打扮」页，「大衣」出现在 20 条反链里、全库只有 40 篇有，特征度 ≈ 20 × 4.8 ≈ 97；「喜欢」出现在 60 条反链里，但全库 3000 篇都有，特征度 ≈ 60 × 1.0 ≈ 59。「喜欢」更常见，但哪儿都有，说明不了这一页的特点，所以「大衣」排在前面。同一条反链里重复多次只算一次；这一页自己的名字和别名不算；只在一条反链里出现的词不上榜（反链不到 5 条时除外）。不用模型、不下载、不建索引文件：每次启动 Obsidian 后第一次显示词频时，在后台把全库读一遍，数出每个词出现在几篇笔记里（几千篇的库几秒钟），结果只存在内存里。这期间第一行显示「正在统计全库…」，先只按出现在几条反链里排。
 - **词对怎么排**：按局部互信息，看两个词同时出现的条数比按它们各自多常见所预计的多出多少，所以两个词不会只因为各自都常见就凑成一对。至少要同时出现在 2 条反链里。
 - **怎么分词**：用系统自带的分词器（`Intl.Segmenter`），再拿库里的页面名和别名当词典，品牌、人名、术语这类专名不会被拆开。双链（交给共现筛选）、标签、网址、代码、块 ID、`key:: value` 属性、数字和常见虚词不算。全部在本机计算。
 

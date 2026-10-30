@@ -313,3 +313,11 @@ body .backlink-pane .tree-item-self.is-clickable.bd-title-row:hover { background
 .workspace-leaf-content.rb-inline-backlinks:not(.no-backlinks) .markdown-source-view.mod-cm6 .cm-sizer > .embedded-backlinks {
   padding-bottom: var(--bullet-fold-scroll-reserve, 50vh);
 }
+
+/* 右侧栏叠放的折叠（emacs-logseq-inspired-outline 的 styles.css 里是同一条，类名两个插件共用）：这一组标签只留标签页头。
+   · Obsidian 给侧边栏里每组写的是 flex: 1 0 0 + height: 0，拖动分隔线后还会把 flex-grow 写在元素上：
+     折叠的组改按内容撑高（height: auto），flex 要盖过行内样式只能用 !important
+   · 内容压成 0 高而不是 display: none：Obsidian 只给「看得见」的页（offsetParent 不为空）出标签页右键菜单，
+     藏掉了，折叠的页右键就没有「展开」 */
+.mod-right-split > .workspace-tabs.sidebar-stack-collapsed { flex: 0 0 auto !important; height: auto; }
+.mod-right-split > .workspace-tabs.sidebar-stack-collapsed > .workspace-tab-container { flex: 0 0 0; height: 0; overflow: hidden; }

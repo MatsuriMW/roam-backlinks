@@ -75,6 +75,12 @@ const STRINGS = {
     stackClose: "Close",
     stackCloseOthers: "Close other notes in the sidebar",
     stackCloseAll: "Close all notes in the sidebar",
+    stackCollapse: "Collapse",
+    stackCollapseOthers: "Collapse others",
+    stackCollapseAll: "Collapse all",
+    stackExpand: "Expand",
+    stackExpandAll: "Expand all",
+    stackOpenInMain: "Open in main area",
     noGroups: "No co-mentioned pages to group by",
     other: "Other",
     clusterOn: "Showing only this cluster · click to cancel",
@@ -153,6 +159,12 @@ const STRINGS = {
     stackClose: "关闭",
     stackCloseOthers: "关闭侧边栏里的其他笔记",
     stackCloseAll: "关闭侧边栏里的全部笔记",
+    stackCollapse: "折叠",
+    stackCollapseOthers: "折叠其他",
+    stackCollapseAll: "全部折叠",
+    stackExpand: "展开",
+    stackExpandAll: "全部展开",
+    stackOpenInMain: "在主区打开",
     noGroups: "没有可分组的共现页",
     other: "其它",
     clusterOn: "正在只看这簇 · 点=取消",
@@ -541,6 +553,71 @@ function watchPairWrap(ta) {
   takeSnap();
 }
 
+// ---------- 右侧栏叠放（emacs-logseq-inspired-outline 里有同样的一份，改一边要同步改另一边） ----------
+// 两个插件都装时只跑一份：先加载的那个把自己的 id 登记在 workspace.sidebarStackOwner，侧边栏菜单、折叠展开由它管；
+// 它停用时让出来、发 sidebar-stack-released，另一个接手。两边打开新页都用 stackLeaf 这条规则，所以叠成同一列。彼此不调用对方的函数
+const STACK_OWNER = "sidebarStackOwner", STACK_RELEASED = "sidebar-stack-released", STACK_COLLAPSED = "sidebar-stack-collapsed";
+
+// 右侧栏里打开的笔记，从上到下：能按扩展名打开文件的视图（Markdown、PDF、画布……）和空白标签都算，反链、大纲、各插件的面板不算。
+// 侧边栏里没激活的标签是延迟视图，leaf.view 只是占位，类型要读 getViewState()
+function sidebarNotes(app) {
+  const ws = app.workspace, types = new Set(["empty", ...Object.values(app.viewRegistry.typeByExtension || {})]);
+  const notes = [];
+  ws.iterateAllLeaves((leaf) => { if (leaf.getRoot() === ws.rightSplit && types.has(leaf.getViewState().type)) notes.push(leaf); });
+  return notes;
+}
+
+// 叠放的新页放哪：接在右侧栏最下面那篇笔记的下面（往下切出新的一组）；右侧栏里还没有笔记，就开在最上面那组的新标签里。
+// 不记状态，只看右侧栏现在的样子，所以重启 Obsidian 之后也接得上
+function stackLeaf(app) {
+  const ws = app.workspace, last = sidebarNotes(app).pop(), top = ws.rightSplit.children[0];
+  if (ws.rightSplit.collapsed) ws.rightSplit.expand();
+  let leaf = null;
+  if (last) try { leaf = ws.createLeafBySplit(last, "horizontal", false); } catch (e) {}
+  if (!leaf && top) try { leaf = ws.createLeafInParent(top, 0); } catch (e) {}
+  return leaf || ws.getRightLeaf(true);   // 手机上侧边栏是抽屉，切分不了
+}
+
+// 折叠 = 这一页所在的那组标签只留标签页头：类名加在组上，styles.css 里两个插件写的是同一条
+const stackGroup = (leaf) => leaf.parent?.containerEl;
+const isStackCollapsed = (leaf) => !!stackGroup(leaf)?.hasClass(STACK_COLLAPSED);
+const setStackCollapsed = (leaf, on) => stackGroup(leaf)?.toggleClass(STACK_COLLAPSED, on);
+
+// 右侧栏笔记的菜单（标签页头右键 / 视图右上角「⋯」），和 Logseq 侧边栏每一页的菜单一样，有几页时才出「其他 / 全部」。
+// 自带的「关闭其他标签页」只在主区有、只管同一组，叠放出来的每一页各占一组，所以另做。固定了的标签不关；全关之后没笔记了就收起侧边栏
+function addStackMenu(app, menu, leaf, text) {
+  const notes = sidebarNotes(app);
+  if (!notes.includes(leaf)) return;
+  const add = (section, key, icon, run) => menu.addItem((item) => item.setSection(section).setTitle(text(key)).setIcon(icon).onClick(run));
+  const others = notes.filter((l) => l !== leaf), multi = notes.length > 1, collapsed = isStackCollapsed(leaf);
+  if (!menu.items.some((it) => it.section === "close")) add("close", "stackClose", "lucide-x", () => leaf.detach());   // 「⋯」菜单里没有自带的「关闭」
+  if (multi) {
+    add("close", "stackCloseOthers", "lucide-x", () => others.forEach((l) => { if (!l.pinned) l.detach(); }));
+    add("close", "stackCloseAll", "lucide-x", () => {
+      notes.forEach((l) => { if (!l.pinned) l.detach(); });
+      if (!sidebarNotes(app).length) app.workspace.rightSplit.collapse();
+    });
+  }
+  if (!collapsed) add("pane", "stackCollapse", "lucide-chevrons-down-up", () => setStackCollapsed(leaf, true));
+  if (multi) {
+    // 和这一页在同一组里的不折：折了就把这一页也折了
+    add("pane", "stackCollapseOthers", "lucide-chevrons-down-up", () => others.forEach((l) => { if (l.parent !== leaf.parent) setStackCollapsed(l, true); }));
+    add("pane", "stackCollapseAll", "lucide-chevrons-down-up", () => notes.forEach((l) => setStackCollapsed(l, true)));
+  }
+  if (collapsed) add("pane", "stackExpand", "lucide-chevrons-up-down", () => setStackCollapsed(leaf, false));
+  if (multi) add("pane", "stackExpandAll", "lucide-chevrons-up-down", () => notes.forEach((l) => setStackCollapsed(l, false)));
+  if (leaf.getViewState().state?.file) add("open", "stackOpenInMain", "lucide-arrow-up-right", () => openInMain(app, leaf));
+}
+
+// 在主区打开（Logseq 的 Open as page）：侧边栏里这一页留着，主区最近用的那个标签换成它；那个标签固定了就在它旁边开新标签
+async function openInMain(app, leaf) {
+  const ws = app.workspace, main = ws.getMostRecentLeaf(ws.rootSplit);
+  const target = main.pinned ? ws.createLeafInParent(main.parent, main.parent.children.indexOf(main) + 1) : main;
+  const { type, state } = leaf.getViewState();
+  await target.setViewState({ type, state, active: true });
+  ws.setActiveLeaf(target, { focus: true });
+}
+
 module.exports = class RoamBacklinks extends Plugin {
   async onload() {
     S = this.settings = Object.assign({}, DEFAULTS, await this.loadData());
@@ -626,9 +703,9 @@ module.exports = class RoamBacklinks extends Plugin {
     try { const tm = this.app.metadataTypeManager; if (tm && typeof tm.setType === "function") tm.setType(caseKeys()[0], "checkbox"); } catch (e) {}
 
     // 跳到当前笔记的反向链接（去设置里给它绑快捷键）
-    // 右侧栏叠放的管理，和 Logseq 侧边栏每一页的菜单一样：右键标签页头、或点视图右上角的「⋯」，多出「关闭其他」「关闭全部」。
-    // 自带的「关闭其他标签页 / 关闭全部」只在主区有、只管同一组标签，而叠放出来的每一页各占一组，所以另做
-    this.registerEvent(this.app.workspace.on("leaf-menu", (menu, leaf) => this.addStackMenu(menu, leaf)));
+    // 右侧栏叠放的菜单和折叠：没人管就接过来；装了同一份代码的另一个插件（emacs-logseq-inspired-outline）停用时也接过来
+    this.registerEvent(this.app.workspace.on(STACK_RELEASED, () => this.claimSidebarStack()));
+    this.claimSidebarStack();
 
     this.addCommand({
       id: "goto-backlinks",
@@ -2819,54 +2896,29 @@ module.exports = class RoamBacklinks extends Plugin {
     if (off == null || typeof m.content !== "string") return -1;
     return m.content.substring(0, off).split("\n").length - 1;
   }
-  // 右侧栏里打开的笔记 = 叠放的那些页，不管是怎么打开的：能按扩展名打开文件的视图（Markdown、PDF、画布……）和空白标签都算，
-  // 反链、大纲、各家插件的面板不算。侧边栏里没激活的标签是延迟视图，leaf.view 只是占位，类型要读 getViewState()
-  sidebarNotes() {
+  // 接管右侧栏叠放的菜单和折叠（两个插件都装时只跑一份，见 STACK_OWNER）
+  claimSidebarStack() {
     const ws = this.app.workspace;
-    const types = new Set(["empty", ...Object.values(this.app.viewRegistry.typeByExtension || {})]);
-    const notes = [];
-    ws.iterateAllLeaves((leaf) => { if (leaf.getRoot() === ws.rightSplit && types.has(leaf.getViewState().type)) notes.push(leaf); });
-    return notes;
-  }
-  // 右侧栏笔记的菜单（标签页头右键 / 「⋯」）：关闭、关闭其他、关闭全部。和自带的一样，固定了的标签不关；
-  // 全关之后侧边栏里没有笔记了就收起来（Logseq 的「全部关闭」也是连侧边栏一起收起）
-  addStackMenu(menu, leaf) {
-    const notes = this.sidebarNotes();
-    if (!notes.includes(leaf)) return;
-    if (!menu.items.some((it) => it.section === "close"))   // 「⋯」菜单里没有自带的「关闭」
-      menu.addItem((item) => item.setSection("close").setTitle(t("stackClose")).setIcon("lucide-x").onClick(() => leaf.detach()));
-    const others = notes.filter((l) => l !== leaf && !l.pinned);
-    if (!others.length) return;
-    menu.addItem((item) => item.setSection("close").setTitle(t("stackCloseOthers")).setIcon("lucide-x").onClick(() => others.forEach((l) => l.detach())));
-    menu.addItem((item) => item.setSection("close").setTitle(t("stackCloseAll")).setIcon("lucide-x").onClick(() => {
-      others.forEach((l) => l.detach());
-      if (!leaf.pinned) leaf.detach();
-      if (!this.sidebarNotes().length) this.app.workspace.rightSplit.collapse();
-    }));
-  }
-  // 右侧栏叠放：第一块开在右侧栏最上面那组的新标签里；之后每块接在上一块下面（往下切分）
-  stackLeaf() {
-    const ws = this.app.workspace;
-    const alive = (this.__bdStack || []).filter((l) => l && l.parent && l.view && l.getRoot && l.getRoot() === ws.rightSplit);
-    this.__bdStack = alive;
-    const last = alive[alive.length - 1];
-    let leaf = null;
-    if (last) {
-      try { leaf = ws.createLeafBySplit(last, "horizontal", false); } catch (e) {}
-    }
-    if (!leaf) {
-      const top = ws.rightSplit && ws.rightSplit.children && ws.rightSplit.children[0];
-      try { if (top) leaf = ws.createLeafInParent(top, 0); } catch (e) {}
-      if (!leaf) leaf = ws.getRightLeaf(true);
-    }
-    alive.push(leaf);
-    return leaf;
+    if (this.stackReleased || ws[STACK_OWNER]) return;
+    ws[STACK_OWNER] = this.manifest.id;
+    const c = this.addChild(new Component());
+    c.registerEvent(ws.on("leaf-menu", (menu, leaf) => addStackMenu(this.app, menu, leaf, t)));
+    // 折叠了的页：点它的标签页头、或者它被激活，就展开
+    c.registerEvent(ws.on("active-leaf-change", (leaf) => { if (leaf && isStackCollapsed(leaf)) setStackCollapsed(leaf, false); }));
+    c.registerDomEvent(document, "click", (e) => {
+      const group = e.target.closest?.(`.workspace-tabs.${STACK_COLLAPSED}`);
+      if (group && e.target.closest(".workspace-tab-header-container")) group.removeClass(STACK_COLLAPSED);
+    });
+    c.register(() => {   // 停用时让出来，另一个插件接手（自己正在卸载，别再接回来）
+      delete ws[STACK_OWNER];
+      this.stackReleased = true;
+      ws.trigger(STACK_RELEASED);
+    });
   }
   async openStackedFile(file, line) {
     if (!file) return;
     const ws = this.app.workspace;
-    if (ws.rightSplit && ws.rightSplit.collapsed) ws.rightSplit.expand();
-    const leaf = this.stackLeaf();
+    const leaf = stackLeaf(this.app);
     // 用实时预览打开：Zoom 是编辑器命令，阅读视图里用不了
     await leaf.setViewState({ type: "markdown", state: { file: file.path, mode: "source", source: false }, active: true });
     ws.revealLeaf(leaf);

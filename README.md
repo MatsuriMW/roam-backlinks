@@ -6,6 +6,20 @@ Obsidian's backlinks panel shows a line or two of plain text around each link. I
 
 [中文说明](#中文说明)
 
+**Contents**
+
+- [The core: backlinks you can read and edit like in Logseq and Roam Research](#the-core-backlinks-you-can-read-and-edit-like-in-logseq-and-roam-research)
+- [Finding your way through many backlinks](#finding-your-way-through-many-backlinks)
+- [Word stats](#word-stats)
+- [Export to PDF with backlinks](#export-to-pdf-with-backlinks)
+- [How it compares](#how-it-compares)
+- [Settings](#settings)
+- [Commands](#commands)
+- [Installation](#installation)
+- [Notes](#notes)
+- [Feedback and updates](#feedback-and-updates)
+- [License](#license)
+
 ## The core: backlinks you can read and edit like in Logseq and Roam Research
 
 - **Whole blocks, not snippets.** A linked list item is shown with all its children; a linked heading with its whole section. A child that links here again is folded into its parent instead of being listed twice.
@@ -112,7 +126,13 @@ To follow new features, send feedback or keep up with progress, follow me on Twi
 
 Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logseq 或 Roam Research 的人会想念真正的反链：整块内容、它的子块、它在原文里的位置，以及就地改掉它的能力。这个插件把这套体验带进 Obsidian 自己的反链面板和正文底部的反链。
 
-**核心：像 Logseq、Roam Research 一样看反链、改反链**
+**目录**
+
+- [核心：像 Logseq、Roam Research 一样看反链、改反链](#核心像-logseqroam-research-一样看反链改反链)
+- [反链多了也找得到](#反链多了也找得到)
+- [词频：反链里都在说什么](#词频反链里都在说什么)
+
+### 核心：像 Logseq、Roam Research 一样看反链、改反链
 
 - **以块为单位**：命中的列表项连同全部子块一起显示，命中的标题显示整节；母块已经显示过的引用，子块里不再重复列一条。
 - **面包屑**：每块上方一行灰字，列出它所在的标题和各级母块。点某一级就地展开上下文，可以一级级点到最外层；⌘ 点跳到原文那一行，Shift 点在右侧栏打开。
@@ -120,14 +140,14 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 - **按 Markdown 渲染**：链接可点、可悬停预览，复选框可以直接勾。
 - **像 Logseq 一样折叠子块**、**块引用计数**、**Shift 点在右侧栏叠放**（装了 Zoom 插件时列表块会聚焦进去；一页接在上一页下面，重启后也接得上。右键侧边栏笔记的标签或点它的「⋯」，是和 Logseq 侧边栏一样的菜单：关闭、关闭其他、全部关闭；折叠、折叠其他、全部折叠；展开、全部展开；在主区打开。折叠的笔记只留标签，点一下标签就展开；折叠了哪几页，重启 Obsidian 后照旧。[Emacs Logseq Inspired Outline](https://github.com/MatsuriMW/emacs-logseq-inspired-outline) 给正文里的双链加了 Shift 点，它里面有同一份侧边栏代码：两个插件都装时只跑一份，叠在同一列）。
 
-**反链多了也找得到**
+### 反链多了也找得到
 
 - 页面按关系紧密度排在前（互链 > 属性里链过来 > 提到次数），日记在后按日期从新到旧，最近 12 个月按月分段，更早的按年折叠。日记的文件夹和日期格式读核心插件「日记」的设置，也可以自己填。
 - 共现筛选（Roam 式）、分组、按别名筛选、正文底部的文字筛选框。
 - **按页开的词频**：对某一页点「词频」，列出它反链里的特征词和常一起出现的词对，点一下只看含它们的块。详见下面「词频」一节。
 - 「转为链接」后面板不刷新、不重排，阅读位置不变；可以按笔记设置区分大小写。
 
-**词频：反链里都在说什么**
+### 词频：反链里都在说什么
 
 共现筛选告诉你哪些**页面**常和这一页一起出现；词频告诉你哪些**词**常和它一起出现，包括你从没加过双链的词。
 

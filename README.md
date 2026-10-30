@@ -14,7 +14,7 @@ Obsidian's backlinks panel shows a line or two of plain text around each link. I
 - **Rendered Markdown.** Lists, bold, links and tasks render as in reading view. Links are clickable and show hover previews; checkboxes can be ticked and are written back.
 - **Folding like Logseq.** First-level children are listed; deeper children fold behind a `…` you can click open. Long lists collapse into `… N more`. Anything that links to the current note is always revealed.
 - **Block reference counts.** Blocks with a `^id` show how many times they are referenced.
-- **Shift-click to stack.** Links, blocks, breadcrumbs and note titles open stacked in the right sidebar, so you can compare several pages side by side. List blocks zoom in with the [Zoom](https://github.com/vslinko/obsidian-zoom) plugin when installed. Each note stacks below the last one in the sidebar, also after restarting Obsidian. Right-click a sidebar note's tab, or open its ⋯ menu, for the same menu as Logseq's sidebar: close, close the other notes or all of them; collapse, collapse the others or all of them; expand, expand all; open in the main area. A collapsed note keeps only its tab; click the tab to expand it again. [Emacs Logseq Inspired Outline](https://github.com/MatsuriMW/emacs-logseq-inspired-outline), which adds Shift-click for links in the editor, carries the same sidebar code: with both plugins installed only one copy runs, and notes opened from either one stack in the same column.
+- **Shift-click to stack.** Links, blocks, breadcrumbs and note titles open stacked in the right sidebar, so you can compare several pages side by side. List blocks zoom in with the [Zoom](https://github.com/vslinko/obsidian-zoom) plugin when installed. Each note stacks below the last one in the sidebar, also after restarting Obsidian. Right-click a sidebar note's tab, or open its ⋯ menu, for the same menu as Logseq's sidebar: close, close the other notes or all of them; collapse, collapse the others or all of them; expand, expand all; open in the main area. A collapsed note keeps only its tab; click the tab to expand it again. Which notes are collapsed is remembered after restarting Obsidian. [Emacs Logseq Inspired Outline](https://github.com/MatsuriMW/emacs-logseq-inspired-outline), which adds Shift-click for links in the editor, carries the same sidebar code: with both plugins installed only one copy runs, and notes opened from either one stack in the same column.
 
 ## Finding your way through many backlinks
 
@@ -118,7 +118,7 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 - **面包屑**：每块上方一行灰字，列出它所在的标题和各级母块。点某一级就地展开上下文，可以一级级点到最外层；⌘ 点跳到原文那一行，Shift 点在右侧栏打开。
 - **就地编辑**：点块里任意位置，就地编辑这一块的 Markdown 并写回原笔记，不用离开当前页面。⌘↩ / ⌘S 保存，Esc 取消，点框外改过就自动保存；支持加粗、斜体、行内代码、高亮快捷键，Tab 调缩进，选中文字输入成对符号会包裹（连按两次 [ 变成 [[双链]]）。
 - **按 Markdown 渲染**：链接可点、可悬停预览，复选框可以直接勾。
-- **像 Logseq 一样折叠子块**、**块引用计数**、**Shift 点在右侧栏叠放**（装了 Zoom 插件时列表块会聚焦进去；一页接在上一页下面，重启后也接得上。右键侧边栏笔记的标签或点它的「⋯」，是和 Logseq 侧边栏一样的菜单：关闭、关闭其他、全部关闭；折叠、折叠其他、全部折叠；展开、全部展开；在主区打开。折叠的笔记只留标签，点一下标签就展开。[Emacs Logseq Inspired Outline](https://github.com/MatsuriMW/emacs-logseq-inspired-outline) 给正文里的双链加了 Shift 点，它里面有同一份侧边栏代码：两个插件都装时只跑一份，叠在同一列）。
+- **像 Logseq 一样折叠子块**、**块引用计数**、**Shift 点在右侧栏叠放**（装了 Zoom 插件时列表块会聚焦进去；一页接在上一页下面，重启后也接得上。右键侧边栏笔记的标签或点它的「⋯」，是和 Logseq 侧边栏一样的菜单：关闭、关闭其他、全部关闭；折叠、折叠其他、全部折叠；展开、全部展开；在主区打开。折叠的笔记只留标签，点一下标签就展开；折叠了哪几页，重启 Obsidian 后照旧。[Emacs Logseq Inspired Outline](https://github.com/MatsuriMW/emacs-logseq-inspired-outline) 给正文里的双链加了 Shift 点，它里面有同一份侧边栏代码：两个插件都装时只跑一份，叠在同一列）。
 
 **反链多了也找得到**
 

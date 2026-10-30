@@ -582,6 +582,13 @@ function stackLeaf(app) {
 const stackGroup = (leaf) => leaf.parent?.containerEl;
 const isStackCollapsed = (leaf) => !!stackGroup(leaf)?.hasClass(STACK_COLLAPSED);
 const setStackCollapsed = (leaf, on) => stackGroup(leaf)?.toggleClass(STACK_COLLAPSED, on);
+// 折叠了哪几页记在这个库的 localStorage 里（键名同类名，两个插件读写同一份）：存页的 id，Obsidian 重启后标签页的 id 不变。
+// 每次折叠 / 展开后重记一遍（关掉的页顺带清掉）；启动后、布局变了（重建、拖动）都按记下的重新套上
+const saveStackCollapsed = (app) => app.saveLocalStorage(STACK_COLLAPSED, sidebarNotes(app).filter(isStackCollapsed).map((l) => l.id));
+function restoreStackCollapsed(app) {
+  const ids = new Set(app.loadLocalStorage(STACK_COLLAPSED) || []);
+  for (const leaf of sidebarNotes(app)) if (ids.has(leaf.id)) setStackCollapsed(leaf, true);
+}
 
 // 右侧栏笔记的菜单（标签页头右键 / 视图右上角「⋯」），和 Logseq 侧边栏每一页的菜单一样，有几页时才出「其他 / 全部」。
 // 自带的「关闭其他标签页」只在主区有、只管同一组，叠放出来的每一页各占一组，所以另做。固定了的标签不关；全关之后没笔记了就收起侧边栏
@@ -589,6 +596,7 @@ function addStackMenu(app, menu, leaf, text) {
   const notes = sidebarNotes(app);
   if (!notes.includes(leaf)) return;
   const add = (section, key, icon, run) => menu.addItem((item) => item.setSection(section).setTitle(text(key)).setIcon(icon).onClick(run));
+  const fold = (key, icon, run) => add("pane", key, icon, () => { run(); saveStackCollapsed(app); });
   const others = notes.filter((l) => l !== leaf), multi = notes.length > 1, collapsed = isStackCollapsed(leaf);
   if (!menu.items.some((it) => it.section === "close")) add("close", "stackClose", "lucide-x", () => leaf.detach());   // 「⋯」菜单里没有自带的「关闭」
   if (multi) {
@@ -598,14 +606,14 @@ function addStackMenu(app, menu, leaf, text) {
       if (!sidebarNotes(app).length) app.workspace.rightSplit.collapse();
     });
   }
-  if (!collapsed) add("pane", "stackCollapse", "lucide-chevrons-down-up", () => setStackCollapsed(leaf, true));
+  if (!collapsed) fold("stackCollapse", "lucide-chevrons-down-up", () => setStackCollapsed(leaf, true));
   if (multi) {
     // 和这一页在同一组里的不折：折了就把这一页也折了
-    add("pane", "stackCollapseOthers", "lucide-chevrons-down-up", () => others.forEach((l) => { if (l.parent !== leaf.parent) setStackCollapsed(l, true); }));
-    add("pane", "stackCollapseAll", "lucide-chevrons-down-up", () => notes.forEach((l) => setStackCollapsed(l, true)));
+    fold("stackCollapseOthers", "lucide-chevrons-down-up", () => others.forEach((l) => { if (l.parent !== leaf.parent) setStackCollapsed(l, true); }));
+    fold("stackCollapseAll", "lucide-chevrons-down-up", () => notes.forEach((l) => setStackCollapsed(l, true)));
   }
-  if (collapsed) add("pane", "stackExpand", "lucide-chevrons-up-down", () => setStackCollapsed(leaf, false));
-  if (multi) add("pane", "stackExpandAll", "lucide-chevrons-up-down", () => notes.forEach((l) => setStackCollapsed(l, false)));
+  if (collapsed) fold("stackExpand", "lucide-chevrons-up-down", () => setStackCollapsed(leaf, false));
+  if (multi) fold("stackExpandAll", "lucide-chevrons-up-down", () => notes.forEach((l) => setStackCollapsed(l, false)));
   if (leaf.getViewState().state?.file) add("open", "stackOpenInMain", "lucide-arrow-up-right", () => openInMain(app, leaf));
 }
 
@@ -2903,11 +2911,15 @@ module.exports = class RoamBacklinks extends Plugin {
     ws[STACK_OWNER] = this.manifest.id;
     const c = this.addChild(new Component());
     c.registerEvent(ws.on("leaf-menu", (menu, leaf) => addStackMenu(this.app, menu, leaf, t)));
-    // 折叠了的页：点它的标签页头、或者它被激活，就展开
-    c.registerEvent(ws.on("active-leaf-change", (leaf) => { if (leaf && isStackCollapsed(leaf)) setStackCollapsed(leaf, false); }));
+    // 折叠状态：启动后、布局变了都按记下的套上。不在「页被激活」时展开：启动时 Obsidian 会重新激活上次那一页，会把记下的折叠冲掉
+    ws.onLayoutReady(() => restoreStackCollapsed(this.app));
+    c.registerEvent(ws.on("layout-change", () => restoreStackCollapsed(this.app)));
+    // 点折叠了的页的标签页头：展开
     c.registerDomEvent(document, "click", (e) => {
       const group = e.target.closest?.(`.workspace-tabs.${STACK_COLLAPSED}`);
-      if (group && e.target.closest(".workspace-tab-header-container")) group.removeClass(STACK_COLLAPSED);
+      if (!group || !e.target.closest(".workspace-tab-header-container")) return;
+      group.removeClass(STACK_COLLAPSED);
+      saveStackCollapsed(this.app);
     });
     c.register(() => {   // 停用时让出来，另一个插件接手（自己正在卸载，别再接回来）
       delete ws[STACK_OWNER];

@@ -72,6 +72,9 @@ const STRINGS = {
     chipTip: (count, s) => `Mentioned together ${count}× · strength ${s} · Click: only with it · Shift-click: exclude it`,
     openTip: `Click: open · ${MOD}click: new tab · Shift-click: stack in the right sidebar`,
     jumpRowTip: `Click: jump · ${MOD}click: new tab · Shift-click: stack in the right sidebar`,
+    stackClose: "Close",
+    stackCloseOthers: "Close other notes in the sidebar",
+    stackCloseAll: "Close all notes in the sidebar",
     noGroups: "No co-mentioned pages to group by",
     other: "Other",
     clusterOn: "Showing only this cluster · click to cancel",
@@ -147,6 +150,9 @@ const STRINGS = {
     chipTip: (count, s) => `共现 ${count} 次 · 紧密度 ${s} · 点=只看含它 · Shift点=排除`,
     openTip: `点=打开 · ${MOD}点=新标签 · Shift点=右侧栏叠放`,
     jumpRowTip: `点=跳转 · ${MOD}点=新标签 · Shift点=右侧栏叠放`,
+    stackClose: "关闭",
+    stackCloseOthers: "关闭侧边栏里的其他笔记",
+    stackCloseAll: "关闭侧边栏里的全部笔记",
     noGroups: "没有可分组的共现页",
     other: "其它",
     clusterOn: "正在只看这簇 · 点=取消",
@@ -620,6 +626,10 @@ module.exports = class RoamBacklinks extends Plugin {
     try { const tm = this.app.metadataTypeManager; if (tm && typeof tm.setType === "function") tm.setType(caseKeys()[0], "checkbox"); } catch (e) {}
 
     // 跳到当前笔记的反向链接（去设置里给它绑快捷键）
+    // 右侧栏叠放的管理，和 Logseq 侧边栏每一页的菜单一样：右键标签页头、或点视图右上角的「⋯」，多出「关闭其他」「关闭全部」。
+    // 自带的「关闭其他标签页 / 关闭全部」只在主区有、只管同一组标签，而叠放出来的每一页各占一组，所以另做
+    this.registerEvent(this.app.workspace.on("leaf-menu", (menu, leaf) => this.addStackMenu(menu, leaf)));
+
     this.addCommand({
       id: "goto-backlinks",
       name: t("cmdGoto"),
@@ -2808,6 +2818,31 @@ module.exports = class RoamBacklinks extends Plugin {
   offsetToLine(m, off) {
     if (off == null || typeof m.content !== "string") return -1;
     return m.content.substring(0, off).split("\n").length - 1;
+  }
+  // 右侧栏里打开的笔记 = 叠放的那些页，不管是怎么打开的：能按扩展名打开文件的视图（Markdown、PDF、画布……）和空白标签都算，
+  // 反链、大纲、各家插件的面板不算。侧边栏里没激活的标签是延迟视图，leaf.view 只是占位，类型要读 getViewState()
+  sidebarNotes() {
+    const ws = this.app.workspace;
+    const types = new Set(["empty", ...Object.values(this.app.viewRegistry.typeByExtension || {})]);
+    const notes = [];
+    ws.iterateAllLeaves((leaf) => { if (leaf.getRoot() === ws.rightSplit && types.has(leaf.getViewState().type)) notes.push(leaf); });
+    return notes;
+  }
+  // 右侧栏笔记的菜单（标签页头右键 / 「⋯」）：关闭、关闭其他、关闭全部。和自带的一样，固定了的标签不关；
+  // 全关之后侧边栏里没有笔记了就收起来（Logseq 的「全部关闭」也是连侧边栏一起收起）
+  addStackMenu(menu, leaf) {
+    const notes = this.sidebarNotes();
+    if (!notes.includes(leaf)) return;
+    if (!menu.items.some((it) => it.section === "close"))   // 「⋯」菜单里没有自带的「关闭」
+      menu.addItem((item) => item.setSection("close").setTitle(t("stackClose")).setIcon("lucide-x").onClick(() => leaf.detach()));
+    const others = notes.filter((l) => l !== leaf && !l.pinned);
+    if (!others.length) return;
+    menu.addItem((item) => item.setSection("close").setTitle(t("stackCloseOthers")).setIcon("lucide-x").onClick(() => others.forEach((l) => l.detach())));
+    menu.addItem((item) => item.setSection("close").setTitle(t("stackCloseAll")).setIcon("lucide-x").onClick(() => {
+      others.forEach((l) => l.detach());
+      if (!leaf.pinned) leaf.detach();
+      if (!this.sidebarNotes().length) this.app.workspace.rightSplit.collapse();
+    }));
   }
   // 右侧栏叠放：第一块开在右侧栏最上面那组的新标签里；之后每块接在上一块下面（往下切分）
   stackLeaf() {

@@ -14,7 +14,7 @@ Obsidian's backlinks panel shows a line or two of plain text around each link. I
 - **Rendered Markdown.** Lists, bold, links and tasks render as in reading view. Links are clickable and show hover previews; checkboxes can be ticked and are written back.
 - **Folding like Logseq.** First-level children are listed; deeper children fold behind a `…` you can click open. Long lists collapse into `… N more`. Anything that links to the current note is always revealed.
 - **Block reference counts.** Blocks with a `^id` show how many times they are referenced.
-- **Shift-click to stack.** Links, blocks, breadcrumbs and note titles open stacked in the right sidebar, so you can compare several pages side by side. List blocks zoom in with the [Zoom](https://github.com/vslinko/obsidian-zoom) plugin when installed.
+- **Shift-click to stack.** Links, blocks, breadcrumbs and note titles open stacked in the right sidebar, so you can compare several pages side by side. List blocks zoom in with the [Zoom](https://github.com/vslinko/obsidian-zoom) plugin when installed. As in Logseq's sidebar, right-click a stacked note's tab, or open its ⋯ menu, to close it, close the other notes in the sidebar, or close them all.
 
 ## Finding your way through many backlinks
 
@@ -94,6 +94,10 @@ Every feature can be turned off in **Settings → Roam Backlinks**: blocks, edit
 - The interface follows Obsidian's language: Chinese for Chinese, English otherwise.
 - Tested on desktop. It should work on mobile, but that is less tested; PDF export is desktop only, as in Obsidian.
 
+## Feedback and updates
+
+To follow new features, send feedback or keep up with progress, follow me on Twitter: [@Matsurimywaifu](https://x.com/Matsurimywaifu).
+
 ## License
 
 [MIT](LICENSE) © MatsuriMW
@@ -114,7 +118,7 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 - **面包屑**：每块上方一行灰字，列出它所在的标题和各级母块。点某一级就地展开上下文，可以一级级点到最外层；⌘ 点跳到原文那一行，Shift 点在右侧栏打开。
 - **就地编辑**：点块里任意位置，就地编辑这一块的 Markdown 并写回原笔记，不用离开当前页面。⌘↩ / ⌘S 保存，Esc 取消，点框外改过就自动保存；支持加粗、斜体、行内代码、高亮快捷键，Tab 调缩进，选中文字输入成对符号会包裹（连按两次 [ 变成 [[双链]]）。
 - **按 Markdown 渲染**：链接可点、可悬停预览，复选框可以直接勾。
-- **像 Logseq 一样折叠子块**、**块引用计数**、**Shift 点在右侧栏叠放**（装了 Zoom 插件时列表块会聚焦进去）。
+- **像 Logseq 一样折叠子块**、**块引用计数**、**Shift 点在右侧栏叠放**（装了 Zoom 插件时列表块会聚焦进去；和 Logseq 的侧边栏一样，右键叠放页的标签或点它的「⋯」，可以关闭这一页、关闭侧边栏里的其他笔记，或者全部关闭）。
 
 **反链多了也找得到**
 
@@ -142,3 +146,5 @@ Obsidian 自带的反链面板只给链接前后一两行纯文本。用过 Logs
 插件在运行时改动自带的反链面板和「导出为 PDF」对话框，不改 Obsidian 本身的文件，停用即还原。Obsidian 更新如果改了这些内部结构，对不上的功能会自动关掉并提示一次（详情在开发者控制台），其余功能照常。
 
 安装：社区插件市场搜索「Roam Backlinks」（审核通过后）；或者从 [最新 Release](https://github.com/MatsuriMW/roam-backlinks/releases/latest) 下载 `main.js`、`manifest.json`、`styles.css` 放进 `<库>/.obsidian/plugins/roam-backlinks/`；或者用 BRAT 添加 `MatsuriMW/roam-backlinks`。
+
+想追踪后续功能、反馈问题、关注后续进展，欢迎关注我的 Twitter：[@Matsurimywaifu](https://x.com/Matsurimywaifu)。

@@ -15,8 +15,8 @@ import json, re, sys
 msg, vault_manifest = sys.argv[1], sys.argv[2]
 m = json.load(open("manifest.json"))
 major, minor, patch = (int(x) for x in m["version"].split("."))
-if re.search(r"#major\s*$", msg): major, minor, patch = major + 1, 0, 0
-elif re.search(r"#minor\s*$", msg): minor, patch = minor + 1, 0
+if re.search(r"#major\s*$", msg, re.M): major, minor, patch = major + 1, 0, 0     # 认每一行的末尾：说明后面还可以跟署名行
+elif re.search(r"#minor\s*$", msg, re.M): minor, patch = minor + 1, 0
 else: patch += 1
 m["version"] = f"{major}.{minor}.{patch}"
 text = json.dumps(m, indent=2, ensure_ascii=False) + "\n"
